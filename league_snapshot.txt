@@ -1,0 +1,400 @@
+======================================================================
+  LEAGUE SNAPSHOT — Post Mega Draft
+======================================================================
+
+  Team                         Avg  Conf             Div             QB     OL     WR      D
+  --------------------------------------------------------------------
+  Northfield Wolves           73.4  Conference A     Division 1    85.4   69.1   75.2   72.3
+  Harborside Knights          72.2  Conference B     Division 2    74.1   69.4   66.5   71.6
+  Sundale Cougars             72.2  Conference B     Division 2    72.9   69.6   65.9   71.9
+  Eastport Eagles             72.1  Conference A     Division 1    82.8   69.0   73.7   72.2
+  Millfield Titans            72.1  Conference B     Division 2    71.8   69.8   65.1   72.5
+  Redstone Vipers             71.9  Conference B     Division 2    72.9   69.3   66.1   71.7
+  Riverdale Bears             71.6  Conference A     Division 1    81.7   69.0   72.1   71.6
+  Crestwood Foxes             71.5  Conference B     Division 1    74.7   69.3   66.9   71.5
+  Westbrook Falcons           71.4  Conference A     Division 1    80.6   69.3   71.6   71.4
+  Irongate Bulls              71.2  Conference B     Division 1    75.6   69.3   67.7   71.3
+  Lakeside Lions              71.1  Conference A     Division 2    77.8   69.0   71.1   71.4
+  Summit Tigers               70.8  Conference A     Division 2    77.5   68.9   70.0   71.1
+  Highland Hawks              70.6  Conference A     Division 2    77.6   68.9   69.4   70.9
+  Clearwater Rams             70.5  Conference B     Division 1    75.8   69.1   68.2   71.0
+  Bayview Sharks              70.5  Conference A     Division 2    75.7   69.1   69.0   71.0
+  Pinecrest Stallions         70.5  Conference B     Division 1    75.8   69.1   68.5   71.0
+
+======================================================================
+  FULL ROSTERS
+======================================================================
+
+  CONFERENCE A
+  Division 1
+  ------------------------------------------------------------------
+
+  NORTHFIELD WOLVES  (avg composite: 73.4)
+  Pos     Grp  Players
+  ................................................................
+  QB     85.4  Tyrone Wilson (Elite, age 26)   Jarvis Washington (Below Avg, age 33)
+  WR     75.2  Lance Holmes (Elite, age 28)   Brandon Bell (Above Avg, age 23)   James Thomas (Average, age 27)   Xavier Scott (Below Avg, age 33)
+  TE     65.8  Curtis Moore (Average, age 28)   Jarvis Simmons (Below Avg, age 31)
+  RB     84.3  Patrick Lee (Elite, age 33)   Miles Holmes (Below Avg, age 32)
+  OL     69.1  Andre Carter (Above Avg, age 27)   Todd Martin (Above Avg, age 22)   Michael Mitchell (Average, age 32)   Eric Baker (Average, age 22)   Quincy Foster (Average, age 29)   Trevor Lawrence (Below Avg, age 30)
+  DT     72.3  Michael Brooks (Elite, age 23)   Trevor King (Average, age 24)   Shaun Stone (Below Avg, age 30)
+  DE     79.5  Marcus Hall (Elite, age 29)   Will Baker (Above Avg, age 26)   Isaiah Young (Average, age 29)
+  LB     65.3  Nathan Griffin (Above Avg, age 26)   Kendall Hayes (Average, age 25)   Omar Powell (Below Avg, age 24)   Blake Sullivan (Below Avg, age 25)
+  CB     71.4  Nick Armstrong (Elite, age 28)   Travis Miller (Average, age 28)   Josh Holmes (Below Avg, age 33)
+  S      72.8  Riley Price (Above Avg, age 24)   Brandon Edwards (Above Avg, age 30)   Isaiah Hayes (Average, age 23)
+  K      89.3  Will Jones (Elite, age 30)
+  P      50.3  Terrell Harris (Below Avg, age 25)
+
+  EASTPORT EAGLES  (avg composite: 72.1)
+  Pos     Grp  Players
+  ................................................................
+  QB     82.8  Patrick Rogers (Elite, age 26)   Kevin Taylor (Below Avg, age 32)
+  WR     73.7  Eli Coleman (Elite, age 25)   Carlos Rogers (Above Avg, age 30)   Patrick Henderson (Average, age 27)   Josh Taylor (Below Avg, age 33)
+  TE     66.0  Cole Knight (Average, age 27)   Lance Young (Below Avg, age 30)
+  RB     81.6  Rico Powell (Elite, age 31)   Reggie Thomas (Below Avg, age 32)
+  OL     69.0  Chad Cooper (Above Avg, age 32)   Tony Miller (Above Avg, age 31)   Evan Butler (Average, age 31)   Mark Harris (Average, age 22)   Mark Bell (Average, age 21)   Aaron Washington (Below Avg, age 26)
+  DT     70.5  Curtis Evans (Elite, age 30)   Cole Allen (Average, age 33)   Chris Gibson (Below Avg, age 24)
+  DE     79.3  Chad Powell (Elite, age 24)   Curtis Stone (Above Avg, age 26)   Trevor Foster (Average, age 25)
+  LB     66.0  Will Lewis (Above Avg, age 24)   Cameron Patterson (Average, age 30)   Cameron Freeman (Below Avg, age 24)   Tyrone Bailey (Below Avg, age 21)
+  CB     71.9  Trevor Clark (Elite, age 28)   Riley Brown (Average, age 25)   Todd Matthews (Below Avg, age 28)
+  S      73.3  Wes Reed (Above Avg, age 29)   Justin Allen (Above Avg, age 24)   Frank Adams (Average, age 27)
+  K      79.9  Frank Brown (Above Avg, age 24)
+  P      51.2  Xavier Price (Below Avg, age 32)
+
+  RIVERDALE BEARS  (avg composite: 71.6)
+  Pos     Grp  Players
+  ................................................................
+  QB     81.7  Todd Freeman (Elite, age 24)   Rico Smith (Below Avg, age 30)
+  WR     72.1  Nathan Foster (Elite, age 25)   Eric Hayes (Above Avg, age 25)   Garrett Watson (Average, age 26)   Darius Cook (Below Avg, age 32)
+  TE     66.2  Justin Richardson (Average, age 25)   Zach Griffin (Below Avg, age 32)
+  RB     80.3  Cole Howard (Elite, age 32)   Curtis Simmons (Below Avg, age 26)
+  OL     69.0  Jarvis Jordan (Above Avg, age 28)   Eric Armstrong (Above Avg, age 28)   Cameron Crawford (Average, age 29)   Logan Rogers (Average, age 31)   Damon Coleman (Average, age 25)   Robert Rogers (Below Avg, age 24)
+  DT     70.4  Andre Price (Elite, age 28)   Wes Clark (Average, age 26)   Logan Adams (Below Avg, age 30)
+  DE     76.8  Trevor Reed (Elite, age 28)   Omar Davis (Elite, age 21)   Garrett Lawrence (Average, age 22)
+  LB     66.9  Jason Spencer (Above Avg, age 23)   Marcus Peterson (Average, age 32)   Andre Rogers (Below Avg, age 25)   Patrick Thomas (Below Avg, age 23)
+  CB     71.5  Miles Hall (Elite, age 25)   Reggie Ross (Average, age 30)   Eric Reed (Below Avg, age 28)
+  S      72.6  Kevin Nelson (Above Avg, age 29)   Jabari Lewis (Average, age 30)   Xavier Hall (Average, age 31)
+  K      79.7  Quincy James (Above Avg, age 28)
+  P      52.2  Hunter Stewart (Below Avg, age 28)
+
+  WESTBROOK FALCONS  (avg composite: 71.4)
+  Pos     Grp  Players
+  ................................................................
+  QB     80.6  Kyle Peterson (Elite, age 25)   Zach Scott (Below Avg, age 28)
+  WR     71.6  Chris Jenkins (Elite, age 25)   Rico Simmons (Above Avg, age 30)   Justin Parker (Average, age 29)   Hunter Hughes (Below Avg, age 26)
+  TE     68.1  Drew Young (Average, age 26)   Garrett Turner (Below Avg, age 23)
+  RB     80.3  Garrett Butler (Elite, age 27)   Victor Stewart (Below Avg, age 30)
+  OL     69.3  Quincy Banks (Elite, age 26)   Tyrone Harrison (Above Avg, age 28)   Ryan Cruz (Average, age 23)   Blake Banks (Average, age 30)   Devon Long (Average, age 26)   Marcus Freeman (Below Avg, age 22)
+  DT     71.0  Jason Wright (Elite, age 27)   Eli Wright (Average, age 28)   Cole Mitchell (Below Avg, age 25)
+  DE     75.8  Curtis Mitchell (Elite, age 25)   Drew Allen (Elite, age 26)   Isaiah Russell (Average, age 25)
+  LB     67.2  Chad Gibson (Above Avg, age 26)   Hunter Bennett (Average, age 23)   Patrick Phillips (Below Avg, age 26)   Frank Martin (Below Avg, age 21)
+  CB     71.0  Omar Davis (Elite, age 28)   Chad Powell (Average, age 26)   Thomas Coleman (Below Avg, age 23)
+  S      72.2  Travis Sullivan (Above Avg, age 24)   Shaun Graham (Average, age 29)   Thomas Martin (Average, age 21)
+  K      75.6  Jalen Davis (Above Avg, age 29)
+  P      53.4  Quincy Jordan (Below Avg, age 33)
+  Division 2
+  ------------------------------------------------------------------
+
+  LAKESIDE LIONS  (avg composite: 71.1)
+  Pos     Grp  Players
+  ................................................................
+  QB     77.8  Darius Hunter (Elite, age 31)   Ryan Perry (Below Avg, age 24)
+  WR     71.1  Omar Bennett (Elite, age 28)   Omar Morris (Above Avg, age 30)   Tony Grant (Average, age 26)   Drew Powell (Below Avg, age 28)
+  TE     68.5  David Ross (Average, age 26)   Logan Lewis (Below Avg, age 27)
+  RB     79.8  Thomas Scott (Elite, age 30)   James Hall (Elite, age 27)
+  OL     69.0  Brandon Foster (Elite, age 28)   Cameron Price (Above Avg, age 27)   Xavier Price (Average, age 25)   Kendall Powell (Average, age 33)   Seth Ward (Average, age 31)   Cole Lewis (Below Avg, age 32)
+  DT     71.3  Kyle Brown (Elite, age 24)   Dante Perry (Average, age 25)   Chris Davis (Below Avg, age 24)
+  DE     74.9  David Hamilton (Elite, age 29)   Michael Brown (Average, age 31)   Garrett Dixon (Average, age 25)
+  LB     67.8  Travis Burke (Above Avg, age 29)   Nathan Cox (Average, age 29)   DeShawn Richardson (Elite, age 31)   Travis Baker (Below Avg, age 33)
+  CB     71.0  Jason Jordan (Elite, age 27)   Jason Garcia (Average, age 24)   Brandon Owens (Below Avg, age 31)
+  S      71.8  Brandon Long (Above Avg, age 32)   Matt Ward (Average, age 25)   Thomas Turner (Average, age 28)
+  K      75.5  Thomas Hamilton (Above Avg, age 28)
+  P      54.7  Patrick Bell (Below Avg, age 25)
+
+  SUMMIT TIGERS  (avg composite: 70.8)
+  Pos     Grp  Players
+  ................................................................
+  QB     77.5  Brandon Baker (Above Avg, age 27)   Robert Johnson (Below Avg, age 30)
+  WR     70.0  Cameron Price (Above Avg, age 28)   Aaron Green (Above Avg, age 23)   Kyle Foster (Average, age 31)   Evan Foster (Below Avg, age 27)
+  TE     68.7  Michael White (Average, age 22)   Aaron Stewart (Below Avg, age 24)
+  RB     78.9  Caleb Cruz (Elite, age 33)   Chad Moore (Average, age 30)
+  OL     68.9  Jabari Moore (Elite, age 30)   Victor Banks (Above Avg, age 25)   Robert Edwards (Average, age 25)   Devon Young (Average, age 31)   Zach Washington (Average, age 30)   Todd Shaw (Below Avg, age 22)
+  DT     70.8  Riley Anderson (Elite, age 23)   Evan Bennett (Average, age 32)   Jarvis Wilson (Below Avg, age 22)
+  DE     74.0  Todd Parker (Elite, age 26)   Sam Allen (Average, age 28)   Jarvis Edwards (Elite, age 29)
+  LB     68.2  James Harrison (Above Avg, age 29)   Matt Bennett (Average, age 23)   DeShawn Peterson (Elite, age 26)   Todd Howard (Below Avg, age 31)
+  CB     70.7  Todd Ross (Above Avg, age 24)   Curtis Bailey (Average, age 28)   Reggie Walker (Below Avg, age 23)
+  S      71.7  Marcus Reed (Above Avg, age 24)   Chris Roberts (Average, age 28)   Xavier Griffin (Average, age 32)
+  K      75.4  Omar Martin (Above Avg, age 25)
+  P      55.0  Brandon Cox (Below Avg, age 33)
+
+  HIGHLAND HAWKS  (avg composite: 70.6)
+  Pos     Grp  Players
+  ................................................................
+  QB     77.6  Chris Taylor (Above Avg, age 32)   Terrell Green (Average, age 21)
+  WR     69.4  Carlos Gibson (Above Avg, age 23)   Seth Baker (Elite, age 30)   Chris Foster (Average, age 29)   Andre Murphy (Below Avg, age 22)
+  TE     70.9  Chad Brooks (Above Avg, age 25)   Jarvis Morgan (Below Avg, age 33)
+  RB     78.8  Travis Owens (Elite, age 25)   Robert Brown (Average, age 27)
+  OL     68.9  Luke Evans (Elite, age 29)   Eli Spencer (Above Avg, age 26)   Garrett Martin (Average, age 25)   Sam Harris (Average, age 26)   Damon Murphy (Average, age 31)   Cameron Bell (Below Avg, age 23)
+  DT     70.9  Drew Garcia (Elite, age 25)   Kendall King (Average, age 23)   Evan Burke (Below Avg, age 27)
+  DE     72.8  Carlos Butler (Above Avg, age 25)   Greg Cook (Average, age 24)   Miles Murphy (Below Avg, age 32)
+  LB     68.5  Mark Cooper (Above Avg, age 26)   Thomas Grant (Average, age 30)   Evan Turner (Elite, age 24)   Todd Mason (Below Avg, age 23)
+  CB     71.0  Terrell Stone (Above Avg, age 24)   Devon Williams (Average, age 29)   Kevin Moore (Below Avg, age 33)
+  S      71.6  Eli Hughes (Above Avg, age 24)   Frank Garcia (Average, age 31)   Nathan Jackson (Average, age 26)
+  K      71.1  Xavier Roberts (Average, age 29)
+  P      55.6  Garrett Wilson (Below Avg, age 33)
+
+  BAYVIEW SHARKS  (avg composite: 70.5)
+  Pos     Grp  Players
+  ................................................................
+  QB     75.7  Isaiah Shaw (Above Avg, age 28)   Jalen Miller (Average, age 30)
+  WR     69.0  Terrell Murphy (Above Avg, age 26)   Chris Thomas (Elite, age 26)   Luke Holmes (Average, age 30)   James James (Below Avg, age 22)
+  TE     75.5  Quincy Wood (Above Avg, age 33)   Matt Cox (Below Avg, age 21)
+  RB     76.8  Matt King (Above Avg, age 24)   Ryan Murray (Average, age 28)
+  OL     69.1  Eli Nelson (Elite, age 26)   David Lawrence (Above Avg, age 25)   Terrell Cook (Average, age 32)   Damon Dixon (Average, age 31)   Chris Thompson (Elite, age 23)   Curtis White (Below Avg, age 30)
+  DT     71.0  Patrick Fisher (Above Avg, age 27)   Marcus Johnson (Average, age 22)   Omar Wright (Below Avg, age 30)
+  DE     72.4  Wes Carter (Above Avg, age 24)   Robert Hamilton (Average, age 33)   Devon Sullivan (Below Avg, age 28)
+  LB     68.9  Trevor Sullivan (Above Avg, age 29)   Patrick Burke (Elite, age 29)   Jalen Perry (Average, age 21)   Eric Adams (Below Avg, age 29)
+  CB     70.9  Greg Johnson (Above Avg, age 24)   Ryan King (Average, age 22)   Omar Hall (Below Avg, age 23)
+  S      71.7  Travis Lawrence (Above Avg, age 24)   Brandon Davis (Average, age 33)   Victor Jackson (Elite, age 30)
+  K      67.3  Hunter Banks (Average, age 29)
+  P      58.1  Will Grant (Below Avg, age 32)
+
+  CONFERENCE B
+  Division 1
+  ------------------------------------------------------------------
+
+  PINECREST STALLIONS  (avg composite: 70.5)
+  Pos     Grp  Players
+  ................................................................
+  QB     75.8  Cameron Porter (Above Avg, age 27)   Marcus Kelly (Average, age 25)
+  WR     68.5  Carlos Murphy (Above Avg, age 29)   Riley Thomas (Average, age 23)   Seth Sullivan (Average, age 22)   Damon Phillips (Below Avg, age 33)
+  TE     76.3  Greg Morris (Above Avg, age 26)   DeShawn Coleman (Below Avg, age 24)
+  RB     77.1  Lance Walker (Above Avg, age 25)   Brandon Turner (Average, age 22)
+  OL     69.1  Jordan Grant (Elite, age 30)   Jason Graham (Above Avg, age 26)   Marcus Jordan (Average, age 27)   Jabari Ward (Average, age 31)   Carlos Allen (Elite, age 27)   Damon Smith (Below Avg, age 26)
+  DT     70.7  Chad Bell (Above Avg, age 28)   Caleb Edwards (Average, age 24)   Frank Simmons (Below Avg, age 24)
+  DE     72.0  DeShawn Russell (Above Avg, age 30)   Devon Davis (Average, age 21)   Quincy Mitchell (Below Avg, age 28)
+  LB     69.4  Xavier Green (Above Avg, age 25)   Blake Powell (Elite, age 26)   Rico Clark (Average, age 26)   Frank Grant (Below Avg, age 29)
+  CB     71.1  Darius Washington (Above Avg, age 31)   Devon Fields (Average, age 29)   Carlos Jenkins (Below Avg, age 26)
+  S      71.9  Mark Harrison (Above Avg, age 25)   Drew Hunter (Average, age 24)   Brandon Allen (Elite, age 29)
+  K      64.5  Aaron Robinson (Average, age 25)
+  P      60.0  Frank Bell (Below Avg, age 29)
+
+  CLEARWATER RAMS  (avg composite: 70.5)
+  Pos     Grp  Players
+  ................................................................
+  QB     75.8  Zach Stone (Above Avg, age 28)   Michael Carter (Average, age 22)
+  WR     68.2  Chad Knight (Above Avg, age 28)   Dante Stewart (Average, age 26)   Robert Moore (Average, age 27)   Kevin Allen (Below Avg, age 31)
+  TE     76.8  Kyle Williams (Above Avg, age 33)   Lance Hughes (Below Avg, age 25)
+  RB     77.0  Shaun Perry (Above Avg, age 24)   Darius Walker (Average, age 24)
+  OL     69.1  Devon Fields (Elite, age 26)   Greg Ross (Above Avg, age 30)   James Price (Average, age 25)   Cameron Richardson (Average, age 30)   Xavier Adams (Below Avg, age 30)   Matt Knight (Below Avg, age 28)
+  DT     70.7  Omar Murray (Above Avg, age 25)   Damon Grant (Average, age 21)   Garrett Murray (Below Avg, age 28)
+  DE     71.3  Victor Phillips (Above Avg, age 26)   Nick Wood (Average, age 24)   Jarvis Scott (Below Avg, age 28)
+  LB     70.4  Tyrone Clark (Elite, age 25)   Jalen Green (Above Avg, age 29)   Chris Murray (Average, age 29)   Sam Nelson (Below Avg, age 29)
+  CB     70.6  Cameron Jones (Above Avg, age 25)   Shaun Cooper (Average, age 27)   Cameron Adams (Below Avg, age 24)
+  S      72.0  DeShawn Cook (Above Avg, age 29)   Logan Ward (Average, age 23)   Jordan Walker (Elite, age 30)
+  K      64.1  Omar Sanders (Average, age 33)
+  P      60.5  Mark Anderson (Below Avg, age 33)
+
+  IRONGATE BULLS  (avg composite: 71.2)
+  Pos     Grp  Players
+  ................................................................
+  QB     75.6  Hunter Scott (Above Avg, age 22)   Matt Taylor (Average, age 24)
+  WR     67.7  Justin Thompson (Above Avg, age 23)   Travis Murray (Average, age 21)   Sam Price (Average, age 33)   Damon Ford (Below Avg, age 23)
+  TE     77.7  Kendall Collins (Above Avg, age 25)   DeShawn Cruz (Below Avg, age 28)
+  RB     75.7  Quincy Rogers (Above Avg, age 32)   Riley Baker (Average, age 27)
+  OL     69.3  Andre Bell (Elite, age 29)   Will Nelson (Above Avg, age 26)   Kevin Price (Average, age 27)   Marcus Graham (Average, age 25)   Garrett Hunter (Below Avg, age 33)   Travis Cooper (Below Avg, age 25)
+  DT     71.0  Jarvis Ward (Above Avg, age 27)   Isaiah Owens (Average, age 23)   Travis Stone (Below Avg, age 22)
+  DE     70.7  Travis Carter (Above Avg, age 24)   Xavier Moore (Average, age 23)   Kevin Grant (Below Avg, age 23)
+  LB     71.7  Jason Martin (Elite, age 27)   Chris Burke (Above Avg, age 24)   Travis Johnson (Average, age 25)   Mark Wright (Below Avg, age 22)
+  CB     70.9  Hunter Bryant (Above Avg, age 25)   Jarvis Davis (Average, age 25)   Isaiah Griffin (Below Avg, age 25)
+  S      72.3  Chris Sanders (Above Avg, age 26)   Kevin Dixon (Average, age 27)   Hunter Owens (Below Avg, age 26)
+  K      63.9  DeShawn Jackson (Average, age 26)
+  P      67.9  Wes Young (Average, age 33)
+
+  CRESTWOOD FOXES  (avg composite: 71.5)
+  Pos     Grp  Players
+  ................................................................
+  QB     74.7  Zach White (Above Avg, age 25)   Jason Young (Average, age 23)
+  WR     66.9  Curtis James (Above Avg, age 26)   Robert Patterson (Average, age 23)   Carlos Thompson (Average, age 32)   Caleb Coleman (Below Avg, age 26)
+  TE     78.6  Greg Taylor (Elite, age 25)   Nick Howard (Elite, age 29)
+  RB     75.6  Damon Davis (Above Avg, age 24)   Matt Hall (Average, age 31)
+  OL     69.3  Omar Coleman (Elite, age 28)   Blake Henderson (Above Avg, age 25)   Cole Ford (Average, age 29)   Patrick Burke (Average, age 21)   Will Henderson (Below Avg, age 29)   Hunter Anderson (Below Avg, age 28)
+  DT     71.3  Tony Hughes (Above Avg, age 24)   Eli Bell (Average, age 21)   Brandon Long (Below Avg, age 27)
+  DE     70.3  Tyrone Cooper (Above Avg, age 26)   Kyle Taylor (Average, age 32)   Chad Watson (Below Avg, age 25)
+  LB     72.5  Seth Green (Elite, age 25)   Jason Dixon (Above Avg, age 26)   James Thompson (Average, age 29)   Cole Price (Below Avg, age 28)
+  CB     71.1  Caleb Stewart (Above Avg, age 29)   Nathan Robinson (Average, age 26)   DeShawn Hill (Below Avg, age 21)
+  S      72.2  Damon James (Above Avg, age 22)   Sam Lawrence (Average, age 26)   Josh Taylor (Below Avg, age 31)
+  K      63.4  Todd Stone (Average, age 28)
+  P      72.1  Patrick Richardson (Elite, age 29)
+  Division 2
+  ------------------------------------------------------------------
+
+  HARBORSIDE KNIGHTS  (avg composite: 72.2)
+  Pos     Grp  Players
+  ................................................................
+  QB     74.1  Isaiah Howard (Above Avg, age 28)   Omar Sullivan (Average, age 25)
+  WR     66.5  Dante Matthews (Above Avg, age 28)   Brandon Bryant (Average, age 32)   Mark Wood (Average, age 24)   Todd Sanders (Below Avg, age 33)
+  TE     80.6  Drew Adams (Elite, age 23)   Drew Taylor (Average, age 24)
+  RB     74.4  Tony Roberts (Above Avg, age 21)   Jarvis Freeman (Average, age 33)
+  OL     69.4  Cameron Lewis (Elite, age 27)   Will Young (Above Avg, age 26)   Caleb Cruz (Average, age 28)   Victor Bryant (Average, age 28)   Carlos Williams (Below Avg, age 30)   Kendall Porter (Below Avg, age 29)
+  DT     71.3  Drew Gibson (Above Avg, age 25)   Andre Baker (Average, age 24)   Josh Young (Below Avg, age 33)
+  DE     69.5  Luke Russell (Above Avg, age 24)   Devon Wilson (Average, age 28)   Damon Carter (Below Avg, age 23)
+  LB     73.1  Terrell Simmons (Elite, age 26)   Kendall Mitchell (Above Avg, age 23)   Michael Cruz (Average, age 26)   Jarvis White (Below Avg, age 26)
+  CB     71.6  Cameron Martin (Above Avg, age 32)   Travis Lewis (Average, age 22)   David Allen (Elite, age 29)
+  S      72.7  Frank Brooks (Elite, age 26)   Chad Hall (Average, age 22)   Carlos Jordan (Below Avg, age 23)
+  K      61.9  Eli Gibson (Below Avg, age 22)
+  P      81.7  Frank Knight (Above Avg, age 28)
+
+  REDSTONE VIPERS  (avg composite: 71.9)
+  Pos     Grp  Players
+  ................................................................
+  QB     72.9  Nathan Hall (Above Avg, age 25)   Michael Butler (Average, age 28)
+  WR     66.1  Mark Hunter (Above Avg, age 33)   Will Hill (Average, age 30)   Shaun Hill (Elite, age 33)   Zach Young (Below Avg, age 22)
+  TE     81.1  Reggie Warren (Elite, age 25)   Patrick Harris (Average, age 24)
+  RB     74.4  Shaun Perry (Above Avg, age 26)   Curtis Butler (Average, age 27)
+  OL     69.3  Damon Hughes (Elite, age 30)   Josh Edwards (Above Avg, age 27)   Carlos Burke (Average, age 32)   Garrett Ross (Average, age 28)   Riley Bell (Below Avg, age 22)   Terrell Stewart (Below Avg, age 33)
+  DT     71.7  Caleb Young (Above Avg, age 29)   Kevin Fields (Average, age 24)   Zach Graham (Below Avg, age 24)
+  DE     68.5  Greg Lawrence (Above Avg, age 22)   Shaun Bryant (Average, age 30)   Zach Owens (Below Avg, age 27)
+  LB     73.7  Caleb Lawrence (Elite, age 26)   David Jones (Above Avg, age 25)   Omar Walker (Average, age 25)   Ryan Reed (Below Avg, age 25)
+  CB     72.1  Garrett Washington (Above Avg, age 27)   Terrell Watson (Elite, age 32)   Jabari Cox (Average, age 31)
+  S      72.3  Cameron Lee (Elite, age 29)   DeShawn Banks (Average, age 22)   Drew Stone (Below Avg, age 32)
+  K      59.3  Tony Brown (Below Avg, age 23)
+  P      82.0  Caleb Perry (Above Avg, age 23)
+
+  SUNDALE COUGARS  (avg composite: 72.2)
+  Pos     Grp  Players
+  ................................................................
+  QB     72.9  Sam Coleman (Above Avg, age 23)   Eric Foster (Average, age 22)
+  WR     65.9  Josh Lawrence (Above Avg, age 26)   Cameron Harris (Average, age 30)   Caleb Lawrence (Elite, age 31)   Riley Carter (Below Avg, age 26)
+  TE     82.1  Ryan Miller (Elite, age 30)   Marcus Smith (Average, age 28)
+  RB     73.5  Xavier Simmons (Above Avg, age 31)   Marcus Owens (Average, age 29)
+  OL     69.6  Jason Brown (Elite, age 28)   Rico Roberts (Above Avg, age 25)   Chris Bryant (Above Avg, age 33)   Zach Sullivan (Average, age 26)   Todd Owens (Below Avg, age 30)   Jason Patterson (Below Avg, age 27)
+  DT     71.6  Seth Smith (Above Avg, age 23)   Nick Wilson (Elite, age 25)   Chad Washington (Below Avg, age 33)
+  DE     67.6  Jason Porter (Above Avg, age 25)   Kyle Jordan (Average, age 31)   Brandon Henderson (Below Avg, age 27)
+  LB     75.1  Jabari Murray (Elite, age 24)   Trevor Perry (Above Avg, age 29)   Justin Powell (Average, age 29)   Jabari Thompson (Below Avg, age 26)
+  CB     72.7  Robert Howard (Above Avg, age 25)   Kendall Cooper (Above Avg, age 31)   Justin Mitchell (Average, age 22)
+  S      72.1  Logan Jones (Elite, age 25)   Patrick Armstrong (Average, age 22)   Seth Knight (Below Avg, age 24)
+  K      55.8  Luke Lawrence (Below Avg, age 30)
+  P      86.9  Miles Jordan (Elite, age 28)
+
+  MILLFIELD TITANS  (avg composite: 72.1)
+  Pos     Grp  Players
+  ................................................................
+  QB     71.8  Marcus Stone (Average, age 31)   Aaron Stone (Average, age 24)
+  WR     65.1  Eli Ford (Above Avg, age 26)   Jason Owens (Average, age 29)   Xavier Thomas (Below Avg, age 27)   Kyle King (Below Avg, age 30)
+  TE     83.4  Damon Bennett (Elite, age 25)   Reggie Matthews (Average, age 28)
+  RB     72.0  Michael Garcia (Average, age 28)   David Anderson (Average, age 23)
+  OL     69.8  Riley Griffin (Elite, age 28)   Kyle Porter (Above Avg, age 30)   Rico Taylor (Above Avg, age 25)   Jabari Knight (Average, age 26)   Damon Thomas (Below Avg, age 23)   Quincy Hill (Below Avg, age 21)
+  DT     72.8  Jalen Hunter (Above Avg, age 23)   Luke Ford (Above Avg, age 23)   Todd Ward (Below Avg, age 26)
+  DE     67.2  Eli Smith (Above Avg, age 29)   Patrick Jenkins (Average, age 25)   Jabari Bennett (Below Avg, age 31)
+  LB     76.0  Tony Stone (Elite, age 29)   Riley Griffin (Above Avg, age 25)   Kendall Washington (Average, age 29)   Isaiah Cruz (Below Avg, age 25)
+  CB     72.7  Robert Lewis (Above Avg, age 28)   Josh Hall (Above Avg, age 27)   Victor Henderson (Average, age 22)
+  S      74.0  Seth Sullivan (Elite, age 26)   Luke Patterson (Average, age 33)   Matt Brown (Below Avg, age 31)
+  K      51.1  Tony Anderson (Below Avg, age 33)
+  P      89.0  Carlos Williams (Elite, age 26)
+
+======================================================================
+  FREE AGENT POOL (undrafted)
+======================================================================
+
+  QB  (4 players)
+    Andre Lawrence         Below Avg    age 22
+    Jarvis Patterson       Below Avg    age 29
+    Justin Collins         Below Avg    age 21
+    Kendall Sanders        Weak         age 22
+
+  WR  (9 players)
+    Omar Murphy            Below Avg    age 29
+    Lance Carter           Weak         age 24
+    Will Bryant            Weak         age 22
+    Michael Porter         Weak         age 27
+    Isaiah Brooks          Weak         age 25
+    Michael Washington     Weak         age 33
+    Brandon Peterson       Weak         age 23
+    James Wood             Weak         age 33
+    Rico Stewart           Weak         age 33
+
+  TE  (4 players)
+    Riley Russell          Weak         age 22
+    Greg Mason             Weak         age 26
+    Matt Walker            Weak         age 33
+    Logan Taylor           Weak         age 33
+
+  RB  (4 players)
+    Curtis Richardson      Below Avg    age 32
+    Matt Nelson            Weak         age 33
+    Robert Perry           Weak         age 31
+    Shaun Porter           Weak         age 23
+
+  OL  (14 players)
+    Eli Hall               Below Avg    age 30
+    Devon Nelson           Below Avg    age 33
+    Jalen Edwards          Below Avg    age 26
+    Evan Green             Below Avg    age 30
+    Shaun Cruz             Below Avg    age 32
+    Nick Harris            Weak         age 27
+    Michael Crawford       Weak         age 31
+    Damon Green            Weak         age 21
+    Wes Washington         Weak         age 29
+    Eric Morgan            Weak         age 33
+    Damon King             Weak         age 33
+    Evan Smith             Weak         age 21
+    Logan Evans            Weak         age 33
+    Garrett Perry          Weak         age 23
+
+  DT  (7 players)
+    Michael Roberts        Below Avg    age 30
+    Cameron Watson         Weak         age 33
+    Dante Harrison         Weak         age 30
+    Miles Hill             Weak         age 30
+    Dante Russell          Weak         age 21
+    Carlos Moore           Weak         age 28
+    Chris Roberts          Weak         age 27
+
+  DE  (7 players)
+    Blake Baker            Below Avg    age 23
+    Andre Lewis            Below Avg    age 32
+    Jarvis Jones           Weak         age 24
+    Luke Price             Weak         age 21
+    Eli Wood               Weak         age 30
+    Jason Hughes           Weak         age 33
+    Miles Banks            Weak         age 33
+
+  LB  (9 players)
+    Seth Lawrence          Weak         age 21
+    Justin Butler          Weak         age 33
+    Xavier Cruz            Weak         age 23
+    DeShawn Cook           Weak         age 33
+    Seth Henderson         Weak         age 33
+    Eli Taylor             Weak         age 26
+    Matt James             Weak         age 21
+    Chad Robinson          Weak         age 33
+    Xavier Holmes          Weak         age 28
+
+  CB  (7 players)
+    Mark Lawrence          Below Avg    age 30
+    Greg Jones             Below Avg    age 22
+    DeShawn Knight         Weak         age 32
+    Thomas Coleman         Weak         age 24
+    Logan Cooper           Weak         age 33
+    Blake Armstrong        Weak         age 27
+    Damon Robinson         Weak         age 32
+
+  S  (7 players)
+    Rico Price             Below Avg    age 30
+    Zach Thomas            Below Avg    age 23
+    Reggie Cox             Below Avg    age 24
+    Patrick Evans          Below Avg    age 25
+    Ryan Stone             Below Avg    age 28
+    Mark Kelly             Weak         age 31
+    Matt Anderson          Weak         age 33
+
+  K  (2 players)
+    Chad Holmes            Weak         age 25
+    Eli Graham             Weak         age 32
+
+  P  (2 players)
+    Isaiah Spencer         Weak         age 33
+    Miles Stone            Weak         age 27
+
+  Total free agents: 76
