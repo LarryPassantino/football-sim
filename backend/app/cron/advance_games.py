@@ -15,7 +15,7 @@ import sys
 
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '..', '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
 from ..database import SessionLocal
 from ..models import League, LeagueStatus
@@ -25,7 +25,11 @@ from sqlalchemy import select
 
 async def main():
     async with SessionLocal() as db:
-        result  = await db.execute(select(League).where(League.status == LeagueStatus.regular))
+        result = await db.execute(
+            select(League).where(
+                League.status.in_([LeagueStatus.regular, LeagueStatus.playoffs])
+            )
+        )
         leagues = result.scalars().all()
 
         for league in leagues:

@@ -108,3 +108,45 @@ class Game(Base):
 
     home_team: Mapped['Team'] = relationship('Team', foreign_keys=[home_team_id], lazy='noload')
     away_team: Mapped['Team'] = relationship('Team', foreign_keys=[away_team_id], lazy='noload')
+
+
+class PlayerGameStats(Base):
+    __tablename__ = 'player_game_stats'
+
+    id:        Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    game_id:   Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('games.id'), nullable=False)
+    player_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('players.id'), nullable=False)
+    team_id:   Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('teams.id'), nullable=False)
+
+    # Passing
+    pass_attempts:        Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    pass_completions:     Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    pass_yards:           Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    pass_tds:             Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    interceptions_thrown: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+
+    # Rushing
+    rush_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    rush_yards:    Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    rush_tds:      Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+
+    # Receiving
+    receptions:      Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    receiving_yards: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    receiving_tds:   Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+
+    # Ball-carrier miscellaneous
+    fumbles:      Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    fumbles_lost: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+
+    # OL
+    sacks_allowed: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+
+    # Defense
+    tackles:           Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    sacks:             Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    interceptions:     Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    forced_fumbles:    Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    fumble_recoveries: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+
+    player: Mapped['Player'] = relationship('Player', lazy='noload')

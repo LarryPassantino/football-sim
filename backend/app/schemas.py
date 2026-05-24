@@ -57,3 +57,56 @@ class GameResponse(BaseModel):
     status: str
 
     model_config = {'from_attributes': True}
+
+
+class PlayerStatLine(BaseModel):
+    player_id:   uuid.UUID
+    player_name: str
+    position:    str
+
+    # Passing
+    pass_attempts:        int = 0
+    pass_completions:     int = 0
+    pass_yards:           int = 0
+    pass_tds:             int = 0
+    interceptions_thrown: int = 0
+
+    # Rushing
+    rush_attempts: int = 0
+    rush_yards:    int = 0
+    rush_tds:      int = 0
+
+    # Receiving
+    receptions:      int = 0
+    receiving_yards: int = 0
+    receiving_tds:   int = 0
+
+    # Ball-carrier misc
+    fumbles:      int = 0
+    fumbles_lost: int = 0
+
+    # OL
+    sacks_allowed: int = 0
+
+    # Defense
+    tackles:           int = 0
+    sacks:             int = 0
+    interceptions:     int = 0
+    forced_fumbles:    int = 0
+    fumble_recoveries: int = 0
+
+
+class GameDetailResponse(BaseModel):
+    id:             uuid.UUID
+    week:           int
+    is_playoff:     bool
+    home_team_id:   uuid.UUID
+    home_team_name: str
+    home_score:     int | None
+    away_team_id:   uuid.UUID
+    away_team_name: str
+    away_score:     int | None
+    status:         str
+    played_at:      datetime | None
+    home_stats:     list[PlayerStatLine]
+    away_stats:     list[PlayerStatLine]

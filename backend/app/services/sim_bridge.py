@@ -8,6 +8,7 @@ Players get a _db_id key (not used by the sim) so we can target DB updates.
 
 import os
 import sys
+import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -23,8 +24,9 @@ from sim.football_sim import ROSTER_SLOTS as SIM_SLOTS, simulate_game
 from sim.injury_sim import (
     build_game_day_sim_team, roll_pregame_injuries, tick_injuries,
 )
+from sim.stats_gen import generate_game_stats
 
-from ..models import Game, GameStatus, Player
+from ..models import Game, GameStatus, Player, PlayerGameStats
 
 
 async def load_team_as_sim_dict(db: AsyncSession, team) -> dict:
@@ -87,7 +89,7 @@ async def clear_all_injuries(db: AsyncSession, league_id) -> None:
 async def play_game(db: AsyncSession, game: Game, home_team, away_team, games_remaining: int) -> None:
     """
     Simulate a single game: roll injuries, build game-day rosters, run sim,
-    write scores and injury state back to DB.
+    write scores, injury state, and per-player stats back to DB.
     """
     home_sim = await load_team_as_sim_dict(db, home_team)
     away_sim = await load_team_as_sim_dict(db, away_team)
@@ -95,7 +97,7 @@ async def play_game(db: AsyncSession, game: Game, home_team, away_team, games_re
     roll_pregame_injuries(home_sim, games_remaining)
     roll_pregame_injuries(away_sim, games_remaining)
 
-    home_score, away_score, _, _ = simulate_game(
+    home_score, away_score, home_outcomes, away_outcomes = simulate_game(
         build_game_day_sim_team(home_sim),
         build_game_day_sim_team(away_sim),
     )
@@ -106,7 +108,35 @@ async def play_game(db: AsyncSession, game: Game, home_team, away_team, games_re
     await write_back_injuries(db, home_sim)
     await write_back_injuries(db, away_sim)
 
+    # Generate and save per-player stats
+    home_off, away_def = generate_game_stats(home_sim, away_sim, dict(home_outcomes))
+    away_off, home_def = generate_game_stats(away_sim, home_sim, dict(away_outcomes))
+    await _save_player_stats(db, game.id, home_team.id, home_off, home_def)
+    await _save_player_stats(db, game.id, away_team.id, away_off, away_def)
+
     game.home_score = home_score
     game.away_score = away_score
     game.status     = GameStatus.complete
     game.played_at  = datetime.now(timezone.utc)
+
+
+async def _save_player_stats(
+    db: AsyncSession,
+    game_id: uuid.UUID,
+    team_id: uuid.UUID,
+    off_stats: dict,
+    def_stats: dict,
+) -> None:
+    """Merge offensive and defensive stat dicts for each player and insert rows."""
+    all_ids = set(off_stats) | set(def_stats)
+    for player_id_str in all_ids:
+        merged = {}
+        merged.update(off_stats.get(player_id_str, {}))
+        for k, v in def_stats.get(player_id_str, {}).items():
+            merged[k] = merged.get(k, 0) + v
+        db.add(PlayerGameStats(
+            game_id=game_id,
+            player_id=uuid.UUID(player_id_str),
+            team_id=team_id,
+            **merged,
+        ))
