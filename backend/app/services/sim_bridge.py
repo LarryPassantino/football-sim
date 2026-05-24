@@ -6,19 +6,12 @@ from the DB into that format, runs sim operations, and writes results back.
 Players get a _db_id key (not used by the sim) so we can target DB updates.
 """
 
-import os
-import sys
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-# Make the sim package importable from the football project root
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
 
 from sim.football_sim import ROSTER_SLOTS as SIM_SLOTS, simulate_game
 from sim.injury_sim import (

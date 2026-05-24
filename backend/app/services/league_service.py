@@ -1,6 +1,4 @@
-import os
 import random
-import sys
 import uuid
 from collections import defaultdict
 from functools import cmp_to_key
@@ -8,10 +6,6 @@ from functools import cmp_to_key
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
 
 from sim.draft_sim import LEAGUE as LEAGUE_STRUCTURE, build_teams, run_draft
 from sim.player_gen import generate_pool
