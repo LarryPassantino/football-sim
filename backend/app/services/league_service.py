@@ -1,23 +1,15 @@
-"""
-league_service.py — League creation and season advancement.
-
-create_league: generates the full player pool, runs the CPU mega-draft,
-  persists all teams/players, builds and stores the 17-week schedule.
-
-advance_week: called by the cron job once per tick; plays all games in
-  the current week and transitions season state when appropriate.
-"""
-
 import os
+import random
 import sys
 import uuid
 from collections import defaultdict
+from functools import cmp_to_key
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
@@ -32,12 +24,13 @@ from ..models import (
 from .sim_bridge import clear_all_injuries, play_game
 
 REGULAR_SEASON_WEEKS = 17
+PLAYOFF_DIVISIONAL   = 18
+PLAYOFF_CONF_CHAMP   = 19
+PLAYOFF_LEAGUE_CHAMP = 20
 
 
 # ============================================================
 # WEEK ASSIGNMENT
-# Greedy: assign each game to the earliest week where neither
-# team already has a game scheduled.
 # ============================================================
 
 def _assign_weeks(schedule: list[tuple], n_weeks: int = REGULAR_SEASON_WEEKS) -> dict[int, list[tuple]]:
@@ -64,12 +57,10 @@ async def create_league(db: AsyncSession, name: str) -> League:
     db.add(league)
     await db.flush()
 
-    # Run the full sim pipeline (CPU-only draft)
     pool      = generate_pool()
     sim_teams = build_teams()
     sim_teams, fa_pool = run_draft(sim_teams, pool, show_rounds=0)
 
-    # Persist teams and their rosters
     team_idx_to_db: dict[int, Team] = {}
     for idx, sim_team in enumerate(sim_teams):
         team = Team(
@@ -96,7 +87,6 @@ async def create_league(db: AsyncSession, name: str) -> League:
                     potential=p['potential'],
                 ))
 
-    # Persist FA pool (team_id=None)
     for pos, players in fa_pool.items():
         for p in players:
             db.add(Player(
@@ -110,7 +100,6 @@ async def create_league(db: AsyncSession, name: str) -> League:
                 potential=p['potential'],
             ))
 
-    # Create season and schedule
     season = Season(league_id=league.id, season_number=1, current_week=1)
     db.add(season)
     await db.flush()
@@ -133,24 +122,117 @@ async def create_league(db: AsyncSession, name: str) -> League:
 
 
 # ============================================================
-# WEEK ADVANCEMENT (called by cron)
+# STANDINGS + PLAYOFF SEEDING
+# ============================================================
+
+async def _get_standings(db: AsyncSession, season: Season) -> dict[uuid.UUID, dict]:
+    """W/L record, point differential, and head-to-head for every team. Regular season only."""
+    result = await db.execute(select(Team).where(Team.league_id == season.league_id))
+    teams  = result.scalars().all()
+
+    standings = {
+        t.id: {
+            'team_id':    t.id,
+            'name':       t.name,
+            'conference': t.conference,
+            'division':   t.division,
+            'wins':       0,
+            'losses':     0,
+            'point_diff': 0,
+            'h2h':        defaultdict(int),  # h2h[opponent_id] = wins vs that opponent
+        }
+        for t in teams
+    }
+
+    result = await db.execute(
+        select(Game).where(
+            Game.season_id   == season.id,
+            Game.status      == GameStatus.complete,
+            Game.is_playoff  == False,
+        )
+    )
+    for game in result.scalars().all():
+        home   = standings[game.home_team_id]
+        away   = standings[game.away_team_id]
+        margin = game.home_score - game.away_score
+
+        home['point_diff'] += margin
+        away['point_diff'] -= margin
+
+        if margin > 0:
+            home['wins']   += 1
+            away['losses'] += 1
+            home['h2h'][game.away_team_id] += 1
+        else:
+            home['losses'] += 1
+            away['wins']   += 1
+            away['h2h'][game.home_team_id] += 1
+
+    return standings
+
+
+def _compare_teams(a: dict, b: dict) -> int:
+    """
+    Comparator for seeding: negative = a ranks higher.
+    Tiebreakers: wins > head-to-head > point differential > coin flip.
+    """
+    if a['wins'] != b['wins']:
+        return b['wins'] - a['wins']
+
+    h2h_a = a['h2h'].get(b['team_id'], 0)
+    h2h_b = b['h2h'].get(a['team_id'], 0)
+    if h2h_a != h2h_b:
+        return h2h_b - h2h_a
+
+    if a['point_diff'] != b['point_diff']:
+        return b['point_diff'] - a['point_diff']
+
+    return random.choice([-1, 1])
+
+
+def _seed_conference(standings: dict, conference: str) -> list[dict]:
+    """
+    Returns 4 playoff seeds for a conference, ordered #1→#4.
+    Division winners guaranteed in; seeds determined purely by record (with tiebreakers).
+    """
+    conf_teams = [t for t in standings.values() if t['conference'] == conference]
+
+    divisions = defaultdict(list)
+    for t in conf_teams:
+        divisions[t['division']].append(t)
+
+    div_winners    = [sorted(teams, key=cmp_to_key(_compare_teams))[0] for teams in divisions.values()]
+    div_winner_ids = {t['team_id'] for t in div_winners}
+
+    wild_cards = sorted(
+        [t for t in conf_teams if t['team_id'] not in div_winner_ids],
+        key=cmp_to_key(_compare_teams),
+    )[:2]
+
+    return sorted(div_winners + wild_cards, key=cmp_to_key(_compare_teams))
+
+
+# ============================================================
+# WEEK ADVANCEMENT
 # ============================================================
 
 async def advance_week(db: AsyncSession, league_id: uuid.UUID) -> dict:
-    """
-    Play all games in the current week for this league.
-    Returns a summary dict for logging.
-    """
     result = await db.execute(
         select(Season).where(
             Season.league_id == league_id,
-            Season.status == SeasonStatus.regular,
+            Season.status.in_([SeasonStatus.regular, SeasonStatus.playoffs]),
         )
     )
     season = result.scalar_one_or_none()
     if not season:
-        return {'skipped': True, 'reason': 'no active regular season'}
+        return {'skipped': True, 'reason': 'no active season'}
 
+    if season.status == SeasonStatus.regular:
+        return await _advance_regular_week(db, season)
+    return await _advance_playoff_week(db, season)
+
+
+async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
     result = await db.execute(
         select(Game)
         .where(Game.season_id == season.id, Game.week == season.current_week)
@@ -159,7 +241,6 @@ async def advance_week(db: AsyncSession, league_id: uuid.UUID) -> dict:
     games = result.scalars().all()
 
     games_remaining = REGULAR_SEASON_WEEKS - season.current_week + 1
-
     for game in games:
         if game.status == GameStatus.complete:
             continue
@@ -168,12 +249,89 @@ async def advance_week(db: AsyncSession, league_id: uuid.UUID) -> dict:
     season.current_week += 1
 
     if season.current_week > REGULAR_SEASON_WEEKS:
+        standings  = await _get_standings(db, season)
+        conferences = list({t['conference'] for t in standings.values()})
+
+        for conf in conferences:
+            seeds = _seed_conference(standings, conf)
+            # #1 hosts #4, #2 hosts #3
+            db.add(Game(season_id=season.id, week=PLAYOFF_DIVISIONAL,
+                        home_team_id=seeds[0]['team_id'], away_team_id=seeds[3]['team_id'],
+                        is_playoff=True))
+            db.add(Game(season_id=season.id, week=PLAYOFF_DIVISIONAL,
+                        home_team_id=seeds[1]['team_id'], away_team_id=seeds[2]['team_id'],
+                        is_playoff=True))
+
         season.status = SeasonStatus.playoffs
-        # TODO: build and run playoff bracket
 
     await db.commit()
     return {'week_played': season.current_week - 1, 'games': len(games)}
 
+
+async def _advance_playoff_week(db: AsyncSession, season: Season) -> dict:
+    games_remaining_map = {
+        PLAYOFF_DIVISIONAL:   3,
+        PLAYOFF_CONF_CHAMP:   2,
+        PLAYOFF_LEAGUE_CHAMP: 1,
+    }
+
+    result = await db.execute(
+        select(Game)
+        .where(
+            Game.season_id  == season.id,
+            Game.week       == season.current_week,
+            Game.is_playoff == True,
+        )
+        .options(selectinload(Game.home_team), selectinload(Game.away_team))
+    )
+    games = result.scalars().all()
+
+    gr = games_remaining_map.get(season.current_week, 1)
+    for game in games:
+        if game.status == GameStatus.complete:
+            continue
+        await play_game(db, game, game.home_team, game.away_team, gr)
+
+    if season.current_week == PLAYOFF_DIVISIONAL:
+        # Group by conference, create one conf championship game per conference
+        conf_games: dict[str, list] = defaultdict(list)
+        for game in games:
+            conf_games[game.home_team.conference].append(game)
+
+        for conf, cg in conf_games.items():
+            winners = [
+                g.home_team_id if g.home_score > g.away_score else g.away_team_id
+                for g in cg
+            ]
+            db.add(Game(season_id=season.id, week=PLAYOFF_CONF_CHAMP,
+                        home_team_id=winners[0], away_team_id=winners[1],
+                        is_playoff=True))
+
+        season.current_week = PLAYOFF_CONF_CHAMP
+
+    elif season.current_week == PLAYOFF_CONF_CHAMP:
+        winners = [
+            g.home_team_id if g.home_score > g.away_score else g.away_team_id
+            for g in games
+        ]
+        db.add(Game(season_id=season.id, week=PLAYOFF_LEAGUE_CHAMP,
+                    home_team_id=winners[0], away_team_id=winners[1],
+                    is_playoff=True))
+
+        season.current_week = PLAYOFF_LEAGUE_CHAMP
+
+    elif season.current_week == PLAYOFF_LEAGUE_CHAMP:
+        await db.commit()
+        await end_season(db, season.league_id)
+        return {'week_played': PLAYOFF_LEAGUE_CHAMP, 'games': len(games), 'champion': True}
+
+    await db.commit()
+    return {'week_played': season.current_week - 1, 'games': len(games)}
+
+
+# ============================================================
+# END SEASON
+# ============================================================
 
 async def end_season(db: AsyncSession, league_id: uuid.UUID) -> None:
     """Clear injuries and move league to offseason."""

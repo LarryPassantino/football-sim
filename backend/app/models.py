@@ -103,6 +103,7 @@ class Game(Base):
     home_score:   Mapped[int|None]       = mapped_column(Integer, nullable=True)
     away_score:   Mapped[int|None]       = mapped_column(Integer, nullable=True)
     status:       Mapped[GameStatus]     = mapped_column(default=GameStatus.scheduled)
+    is_playoff:   Mapped[bool]           = mapped_column(Boolean, default=False)
     played_at:    Mapped[datetime|None]  = mapped_column(DateTime(timezone=True), nullable=True)
 
     home_team: Mapped['Team'] = relationship('Team', foreign_keys=[home_team_id], lazy='noload')
