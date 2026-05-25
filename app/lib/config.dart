@@ -1,0 +1,1 @@
+const String kBaseUrl = 'https://football-sim-production-e0c2.up.railway.app';

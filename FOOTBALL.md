@@ -1,6 +1,6 @@
-# American Football Season Simulator — Design Document
+# Gridiron Empire — Design Document
 
-*Last updated: May 2026.*
+*Last updated: May 2026. Backend + cron fully deployed on Railway; per-game stats complete; standings endpoint next.*
 
 ---
 
@@ -24,7 +24,7 @@ A mobile-first American football team management simulator. Draft a roster from 
 - **16 teams** per league: 2 conferences × 2 divisions × 4 teams
 - **Fictional league** — no NFL licensing (EA holds NFL rights; fictional branding avoids the issue and allows deliberate tuning)
 - **One game per day** — daily engagement loop, roster moves between games
-- **17-game regular season** (NFL-style); playoffs TBD
+- **17-game regular season** (NFL-style) followed by a 3-round playoff
 - CPU auto-manages all teams without a human coach
 - When a human joins a league, they take over a CPU team and inherit its current roster and history
 - Multiple leagues can run simultaneously (see Monetization)
@@ -171,7 +171,7 @@ One game per day. Full cycle is **24–25 days** per season.
 | Phase | Days | Notes |
 |---|---|---|
 | Regular season | 17 | One game/day |
-| Playoffs | 3–4 | 4-team/conf = 3 rounds; 6-team/conf = 4 rounds |
+| Playoffs | 3 | Divisional (week 18) → Conf championships (week 19) → League championship (week 20) |
 | Off-season window | 2–3 | New coaches pick a team; everyone preps for the draft |
 | Season resolution | 1 | Final standings, awards, stat leaders |
 | Draft prep | 1 | Player pool generated, scouting available |
@@ -181,6 +181,23 @@ One game per day. Full cycle is **24–25 days** per season.
 Roughly **1.3–1.4 seasons/month** for an active player.
 
 **Off-season window:** The gap between the championship and the next draft. New human coaches joining the league choose an available team during this window (abandoned or expansion slots). Existing coaches use it to scout the incoming draft class. CPU teams hold any unclaimed slots and auto-draft as normal.
+
+## Playoffs
+
+**4 teams per conference qualify** (8 total, 2 conferences).
+
+**Qualification:** Both division winners are guaranteed a spot. The remaining 2 spots per conference go to the next-best records (wild cards).
+
+**Seeding:** Purely by regular season record regardless of division winner status. Tiebreakers: head-to-head → point differential → coin flip.
+
+**Bracket:**
+- Week 18 — Divisional round: #1 vs #4, #2 vs #3 (per conference; 4 games total)
+- Week 19 — Conference championships: divisional winners face off (2 games)
+- Week 20 — League championship: conference champions (1 game)
+
+Higher seed hosts each game.
+
+---
 
 ## Season Management
 
@@ -341,10 +358,63 @@ This creates a real cut decision: releasing a player surrenders your information
 
 ---
 
+## Build Status
+
+### Sim engine (`backend/sim/`)
+
+Note: `sim/` lives inside `backend/` for Railway deployment — no sys.path hacks needed.
+
+| Module | Status |
+|---|---|
+| `player_gen.py` — pool generation, fitness scoring | Complete |
+| `draft_sim.py` — snake mega-draft, CPU urgency strategy | Complete |
+| `football_sim.py` — two-gate drive resolution, game-day variance | Complete |
+| `season_sim.py` — full pipeline: pool → draft → schedule → standings → playoffs | Complete |
+| `injury_sim.py` — pre-game rolls, fitness-weighted tiers, tick system | Complete |
+| `stats_gen.py` — probabilistic per-player stat distribution from drive outcomes | Complete |
+
+### Backend (`backend/`)
+| Area | Status |
+|---|---|
+| FastAPI app + routing | Complete |
+| JWT auth (register, login, refresh) | Complete |
+| SQLAlchemy async models (League, Coach, Team, Player, Season, Game, PlayerGameStats) | Complete |
+| Alembic migrations on Railway Postgres | Complete (3 migrations: initial, add_is_playoff, add_player_game_stats) |
+| League creation (draft + schedule) | Complete |
+| Regular season advancement (`advance_week`) | Complete |
+| Playoff bracket (seeding, 3-round bracket, tiebreakers) | Complete |
+| Per-game player stats + game detail endpoint | Complete — `GET /leagues/{id}/games/{game_id}` |
+| Cron job (`advance_games.py`) | Complete — deployed on Railway |
+| Railway web service deploy | Complete |
+| Standings endpoint | **Next** |
+
+### Frontend
+| Area | Status |
+|---|---|
+| Flutter app | Not started — after standings endpoint |
+
+---
+
 ## Open Design Questions
 
 - Draft: how many rounds per annual draft? Year 1 human draft position (random vs. chosen)?
-- Playoffs: format, number of teams that qualify per conference (4 or 6)?
 - CPU team AI: how smart should auto-management be for roster moves and draft picks?
 - Private league creation: token-gated or separate premium tier?
 - Team customization: how deep (name only? colors? full uniform builder?)
+
+---
+
+## Future Feature: Cross-League Championship (post-v1 idea)
+
+A "Champions League"-style tournament where each season's league champion is pooled into a periodic championship bracket.
+
+**Concept:**
+- Every 2–3 months, all league champions from that window are seeded into a single-elimination bracket
+- No free agents, no roster moves — each team sims with their current starters as-is
+- Pure prestige: best team across all leagues in that period
+
+**Open questions:**
+- Window length: 2 months vs. 3 months? Depends on how many leagues are active at launch
+- What happens if a champion's team was taken over mid-season? Use the roster at the time of the championship win
+- Bracket size: powers of 2 only, so bye weeks if field isn't full
+- Separate from the regular season loop entirely — no impact on ongoing leagues

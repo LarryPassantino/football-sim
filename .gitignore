@@ -20,13 +20,13 @@ env/
 .env.local
 .env.*.local
 
-# Alembic
-alembic/versions/*.py
-
 # IDE
 .idea/
 .vscode/
 *.iml
+
+# Claude Code
+.claude/
 
 # OS
 .DS_Store
