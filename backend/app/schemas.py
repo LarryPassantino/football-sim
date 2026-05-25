@@ -110,3 +110,19 @@ class GameDetailResponse(BaseModel):
     played_at:      datetime | None
     home_stats:     list[PlayerStatLine]
     away_stats:     list[PlayerStatLine]
+
+
+class StandingRow(BaseModel):
+    team_id:            uuid.UUID
+    name:               str
+    conference:         str
+    division:           str
+    wins:               int
+    losses:             int
+    points_for:         int
+    points_against:     int
+    point_differential: int
+
+
+class StandingsResponse(BaseModel):
+    standings: list[StandingRow]

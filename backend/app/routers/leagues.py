@@ -6,10 +6,10 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_coach, get_db
-from ..models import Coach, Game, League, Player, PlayerGameStats, Season, Team
+from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
     GameDetailResponse, GameResponse, LeagueCreateRequest,
-    LeagueResponse, PlayerStatLine, TeamResponse,
+    LeagueResponse, PlayerStatLine, StandingRow, StandingsResponse, TeamResponse,
 )
 from ..services.league_service import create_league
 
@@ -132,3 +132,57 @@ async def get_game_detail(
         home_stats=home_stats,
         away_stats=away_stats,
     )
+
+
+@router.get('/{league_id}/standings', response_model=StandingsResponse)
+async def get_standings(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    season = result.scalar_one_or_none()
+    if not season:
+        raise HTTPException(status_code=404, detail='No season found')
+
+    result = await db.execute(select(Team).where(Team.league_id == league_id))
+    teams = result.scalars().all()
+
+    rows: dict[uuid.UUID, dict] = {
+        t.id: {
+            'team_id': t.id,
+            'name': t.name,
+            'conference': t.conference,
+            'division': t.division,
+            'wins': 0,
+            'losses': 0,
+            'points_for': 0,
+            'points_against': 0,
+        }
+        for t in teams
+    }
+
+    result = await db.execute(
+        select(Game).where(
+            Game.season_id == season.id,
+            Game.status == GameStatus.complete,
+            Game.is_playoff == False,
+        )
+    )
+    for g in result.scalars().all():
+        home = rows[g.home_team_id]
+        away = rows[g.away_team_id]
+        home['points_for'] += g.home_score
+        home['points_against'] += g.away_score
+        away['points_for'] += g.away_score
+        away['points_against'] += g.home_score
+        if g.home_score > g.away_score:
+            home['wins'] += 1
+            away['losses'] += 1
+        else:
+            away['wins'] += 1
+            home['losses'] += 1
+
+    standing_list = [
+        StandingRow(**r, point_differential=r['points_for'] - r['points_against'])
+        for r in rows.values()
+    ]
+    standing_list.sort(key=lambda r: (r.conference, r.division, -r.wins, -r.point_differential))
+
+    return StandingsResponse(standings=standing_list)
