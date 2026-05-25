@@ -8,12 +8,51 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..dependencies import get_current_coach, get_db
 from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
-    GameDetailResponse, GameResponse, LeagueCreateRequest,
-    LeagueResponse, PlayerStatLine, StandingRow, StandingsResponse, TeamResponse,
+    AvailableLeaguesResponse, GameDetailResponse, GameResponse, LeagueAvailableItem,
+    LeagueCreateRequest, LeagueResponse, PlayerStatLine, StandingRow, StandingsResponse,
+    TeamPickerItem, TeamResponse,
 )
 from ..services.league_service import create_league
 
 router = APIRouter(prefix='/leagues', tags=['leagues'])
+
+
+@router.get('/available', response_model=AvailableLeaguesResponse)
+async def get_available_leagues(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(League))
+    all_leagues = result.scalars().all()
+
+    result = await db.execute(select(Team))
+    all_teams = result.scalars().all()
+
+    teams_by_league: dict[uuid.UUID, list[Team]] = {}
+    for team in all_teams:
+        teams_by_league.setdefault(team.league_id, []).append(team)
+
+    available = []
+    for league in all_leagues:
+        league_teams = teams_by_league.get(league.id, [])
+        open_count   = sum(1 for t in league_teams if t.coach_id is None)
+        if open_count > 0:
+            human_count = sum(1 for t in league_teams if t.coach_id is not None)
+            available.append(LeagueAvailableItem(
+                id=league.id,
+                name=league.name,
+                human_coach_count=human_count,
+                open_team_count=open_count,
+            ))
+
+    if not available:
+        new_league = await create_league(db, f'League {len(all_leagues) + 1}')
+        available.append(LeagueAvailableItem(
+            id=new_league.id,
+            name=new_league.name,
+            human_coach_count=0,
+            open_team_count=16,
+        ))
+
+    available.sort(key=lambda x: -x.human_coach_count)
+    return AvailableLeaguesResponse(leagues=available)
 
 
 @router.post('', response_model=LeagueResponse, status_code=201)
@@ -41,6 +80,36 @@ async def get_league(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 async def get_teams(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Team).where(Team.league_id == league_id))
     return result.scalars().all()
+
+
+@router.get('/{league_id}/teams/available', response_model=list[TeamPickerItem])
+async def get_available_teams(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Team).where(
+            Team.league_id == league_id,
+            Team.coach_id.is_(None),
+        ).order_by(Team.conference, Team.division, Team.name)
+    )
+    return result.scalars().all()
+
+
+@router.post('/{league_id}/teams/{team_id}/claim', response_model=TeamResponse)
+async def claim_team(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id:
+        raise HTTPException(status_code=404, detail='Team not found')
+    if team.coach_id is not None:
+        raise HTTPException(status_code=409, detail='Team already claimed')
+
+    team.coach_id = coach.id
+    team.is_cpu   = False
+    await db.commit()
+    return team
 
 
 @router.get('/{league_id}/schedule', response_model=list[GameResponse])

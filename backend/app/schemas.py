@@ -112,6 +112,26 @@ class GameDetailResponse(BaseModel):
     away_stats:     list[PlayerStatLine]
 
 
+class LeagueAvailableItem(BaseModel):
+    id:                uuid.UUID
+    name:              str
+    human_coach_count: int
+    open_team_count:   int
+
+
+class AvailableLeaguesResponse(BaseModel):
+    leagues: list[LeagueAvailableItem]
+
+
+class TeamPickerItem(BaseModel):
+    id:         uuid.UUID
+    name:       str
+    conference: str
+    division:   str
+
+    model_config = {'from_attributes': True}
+
+
 class StandingRow(BaseModel):
     team_id:            uuid.UUID
     name:               str
