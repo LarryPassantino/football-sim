@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'leagues_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -28,9 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       await context.read<AuthProvider>().login(_emailCtrl.text.trim(), _passCtrl.text);
-      if (mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LeaguesScreen()));
-      }
+      // main.dart reactive routing handles navigation
     } catch (e) {
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
     } finally {
@@ -48,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Football Sim', style: Theme.of(context).textTheme.headlineLarge),
+              Text('Gridiron Empire', style: Theme.of(context).textTheme.headlineLarge),
               const SizedBox(height: 8),
               Text('Sign in to your account', style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 32),

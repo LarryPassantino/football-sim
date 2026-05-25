@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'leagues_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -33,13 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _passCtrl.text,
         _nameCtrl.text.trim(),
       );
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LeaguesScreen()),
-          (_) => false,
-        );
-      }
+      // main.dart reactive routing handles navigation
     } catch (e) {
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
     } finally {

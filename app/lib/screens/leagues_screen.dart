@@ -34,7 +34,7 @@ class LeaguesScreen extends StatelessWidget {
             FilledButton.icon(
               icon: const Icon(Icons.bar_chart),
               label: const Text('Standings'),
-              onPressed: () => Navigator.push(
+              onPressed: auth.leagueId == null ? null : () => Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => StandingsScreen(leagueId: auth.leagueId!),
