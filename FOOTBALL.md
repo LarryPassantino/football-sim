@@ -402,6 +402,17 @@ Note: `sim/` lives inside `backend/` for Railway deployment — no sys.path hack
 - Private league creation: token-gated or separate premium tier?
 - Team customization: how deep (name only? colors? full uniform builder?)
 
+### Planned features (captured mid-build)
+
+**Team names unique per league**
+Team names currently come from the sim engine's hardcoded pool and repeat across leagues. Before multiple leagues are live, the name list should be large enough (or randomized enough) to avoid duplicates, or names should be assigned with per-league uniqueness enforced at creation time.
+
+**Coach-controlled team rename**
+A coach should be able to rename their team at any point. Needs a `PATCH /leagues/{id}/teams/{team_id}` endpoint and a rename affordance in the UI. Simple name field on the team home screen.
+
+**Team history view**
+Season-by-season record for a team — wins, losses, playoff result, any championships. History is tied to `team_id`, not the team name, so renames don't break it. This slots naturally into v3 (multi-season) but the data model should store season outcomes against `team_id` from the start so history accumulates automatically.
+
 ---
 
 ## Future Feature: Cross-League Championship (post-v1 idea)
