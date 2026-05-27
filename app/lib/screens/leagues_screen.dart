@@ -6,6 +6,7 @@ import '../config.dart';
 import '../providers/auth_provider.dart';
 import 'roster_screen.dart';
 import 'schedule_screen.dart';
+import 'scout_screen.dart';
 import 'standings_screen.dart';
 
 class _LeagueDetail {
@@ -198,7 +199,12 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
           label: const Text('Standings'),
           onPressed: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => StandingsScreen(leagueId: leagueId)),
+            MaterialPageRoute(
+              builder: (_) => StandingsScreen(
+                leagueId: leagueId,
+                myTeamId: auth.teamId!,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -210,6 +216,21 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             MaterialPageRoute(
               builder: (_) => ScheduleScreen(
                 leagueId: leagueId,
+                myTeamId: auth.teamId!,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.person_search),
+          label: const Text('Free Agents'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ScoutScreen(
+                leagueId: leagueId,
+                title: 'Free Agents',
                 myTeamId: auth.teamId!,
               ),
             ),

@@ -6,12 +6,13 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_coach, get_db
-from sim.player_gen import POSITION_STATS
+from sim.player_gen import POSITION_STATS, assign_label
 from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
     AvailableLeaguesResponse, GameDetailResponse, GameResponse, LeagueAvailableItem,
     LeagueCreateRequest, LeagueDetailResponse, LeagueResponse, PlayerRosterItem,
-    PlayerStatLine, StandingRow, StandingsResponse, TeamPickerItem, TeamResponse,
+    PlayerScoutItem, PlayerStatLine, StandingRow, StandingsResponse, TeamPickerItem,
+    TeamResponse,
 )
 from ..services.league_service import create_league
 
@@ -139,6 +140,42 @@ async def get_roster(league_id: uuid.UUID, team_id: uuid.UUID, db: AsyncSession 
             age=p.age,
             composite=p.composite,
             named_stats={name: val for name, val in zip(stat_names, p.stats)},
+            injury_games_remaining=p.injury_games_remaining,
+        ))
+    return items
+
+
+@router.get('/{league_id}/teams/{team_id}/scout', response_model=list[PlayerScoutItem])
+async def scout_team(league_id: uuid.UUID, team_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Player)
+        .where(Player.team_id == team_id)
+        .order_by(Player.position, Player.composite.desc())
+    )
+    return _to_scout_items(result.scalars().all())
+
+
+@router.get('/{league_id}/free-agents', response_model=list[PlayerScoutItem])
+async def get_free_agents(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Player)
+        .where(Player.league_id == league_id, Player.team_id.is_(None))
+        .order_by(Player.position, Player.composite.desc())
+    )
+    return _to_scout_items(result.scalars().all())
+
+
+def _to_scout_items(players) -> list[PlayerScoutItem]:
+    items = []
+    for p in players:
+        stat_names = POSITION_STATS.get(p.position, [])
+        items.append(PlayerScoutItem(
+            id=p.id,
+            name=p.name,
+            position=p.position,
+            age=p.age,
+            composite_label=assign_label(p.composite),
+            named_stat_labels={name: assign_label(val) for name, val in zip(stat_names, p.stats)},
             injury_games_remaining=p.injury_games_remaining,
         ))
     return items

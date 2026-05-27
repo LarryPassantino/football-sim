@@ -5,23 +5,23 @@ import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
 
-class _Player {
+class _ScoutPlayer {
   final String id;
   final String name;
   final String position;
   final int age;
-  final double composite;
-  final Map<String, int> namedStats;
+  final String compositeLabel;
+  final Map<String, String> namedStatLabels;
   final int injuryGamesRemaining;
 
-  _Player.fromJson(Map<String, dynamic> j)
+  _ScoutPlayer.fromJson(Map<String, dynamic> j)
       : id = j['id'],
         name = j['name'],
         position = j['position'],
         age = j['age'],
-        composite = (j['composite'] as num).toDouble(),
-        namedStats = (j['named_stats'] as Map<String, dynamic>)
-            .map((k, v) => MapEntry(k, v as int)),
+        compositeLabel = j['composite_label'],
+        namedStatLabels = (j['named_stat_labels'] as Map<String, dynamic>)
+            .map((k, v) => MapEntry(k, v as String)),
         injuryGamesRemaining = j['injury_games_remaining'];
 
   bool get isInjured => injuryGamesRemaining > 0;
@@ -33,25 +33,39 @@ const _positionGroups = {
   'Special Teams': ['K', 'P'],
 };
 
-class RosterScreen extends StatefulWidget {
-  final String leagueId;
-  final String teamId;
-  final String teamName;
+Color _labelColor(String label) {
+  switch (label) {
+    case 'Elite':      return Colors.purple;
+    case 'Above Avg':  return Colors.green;
+    case 'Average':    return Colors.blue;
+    case 'Below Avg':  return Colors.orange;
+    default:           return Colors.grey;
+  }
+}
 
-  const RosterScreen({
+class ScoutScreen extends StatefulWidget {
+  final String leagueId;
+  final String? teamId;  // null = free agents
+  final String title;
+  final String myTeamId;
+
+  const ScoutScreen({
     super.key,
     required this.leagueId,
-    required this.teamId,
-    required this.teamName,
+    required this.title,
+    required this.myTeamId,
+    this.teamId,
   });
 
   @override
-  State<RosterScreen> createState() => _RosterScreenState();
+  State<ScoutScreen> createState() => _ScoutScreenState();
 }
 
-class _RosterScreenState extends State<RosterScreen> {
-  List<_Player>? _players;
+class _ScoutScreenState extends State<ScoutScreen> {
+  List<_ScoutPlayer>? _players;
   String? _error;
+
+  bool get _isFreeAgents => widget.teamId == null;
 
   @override
   void initState() {
@@ -63,14 +77,14 @@ class _RosterScreenState extends State<RosterScreen> {
     setState(() { _error = null; _players = null; });
     try {
       final auth = context.read<AuthProvider>();
-      final res = await http.get(
-        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.teamId}/roster'),
-        headers: auth.authHeaders,
-      );
-      if (res.statusCode != 200) throw Exception('Failed to load roster');
+      final url = _isFreeAgents
+          ? '$kBaseUrl/leagues/${widget.leagueId}/free-agents'
+          : '$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.teamId}/scout';
+      final res = await http.get(Uri.parse(url), headers: auth.authHeaders);
+      if (res.statusCode != 200) throw Exception('Failed to load');
       final data = jsonDecode(res.body) as List;
       setState(() {
-        _players = data.map((j) => _Player.fromJson(j as Map<String, dynamic>)).toList();
+        _players = data.map((j) => _ScoutPlayer.fromJson(j as Map<String, dynamic>)).toList();
       });
     } catch (e) {
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
@@ -81,7 +95,7 @@ class _RosterScreenState extends State<RosterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.teamName),
+        title: Text(widget.title),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
@@ -95,7 +109,7 @@ class _RosterScreenState extends State<RosterScreen> {
   }
 
   Widget _buildRoster() {
-    final byPosition = <String, List<_Player>>{};
+    final byPosition = <String, List<_ScoutPlayer>>{};
     for (final p in _players!) {
       byPosition.putIfAbsent(p.position, () => []).add(p);
     }
@@ -136,7 +150,8 @@ class _RosterScreenState extends State<RosterScreen> {
     );
   }
 
-  Widget _playerTile(_Player player) {
+  Widget _playerTile(_ScoutPlayer player) {
+    final color = _labelColor(player.compositeLabel);
     return ListTile(
       dense: true,
       title: Text(player.name),
@@ -147,50 +162,41 @@ class _RosterScreenState extends State<RosterScreen> {
           if (player.isInjured)
             const Icon(Icons.local_hospital, size: 16, color: Colors.red),
           const SizedBox(width: 8),
-          _compositeChip(player.composite),
+          _labelChip(player.compositeLabel, color),
         ],
       ),
       onTap: () => _showPlayerDetail(player),
     );
   }
 
-  Widget _compositeChip(double composite) {
-    final color = composite >= 83
-        ? Colors.purple
-        : composite >= 73
-            ? Colors.green
-            : composite >= 63
-                ? Colors.blue
-                : composite >= 50
-                    ? Colors.orange
-                    : Colors.grey;
-
+  Widget _labelChip(String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
-        composite.toStringAsFixed(1),
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+        label,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }
 
-  void _showPlayerDetail(_Player player) {
+  void _showPlayerDetail(_ScoutPlayer player) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _PlayerDetailSheet(player: player),
+      builder: (_) => _ScoutPlayerSheet(player: player, isFreeAgents: _isFreeAgents),
     );
   }
 }
 
-class _PlayerDetailSheet extends StatelessWidget {
-  final _Player player;
-  const _PlayerDetailSheet({required this.player});
+class _ScoutPlayerSheet extends StatelessWidget {
+  final _ScoutPlayer player;
+  final bool isFreeAgents;
+  const _ScoutPlayerSheet({required this.player, required this.isFreeAgents});
 
   @override
   Widget build(BuildContext context) {
@@ -223,33 +229,24 @@ class _PlayerDetailSheet extends StatelessWidget {
                     ],
                   ),
                 ),
-                _compositeDisplay(context, player.composite),
+                _compositeDisplay(context, player.compositeLabel),
               ],
             ),
             const Divider(height: 32),
-            for (final entry in player.namedStats.entries)
+            for (final entry in player.namedStatLabels.entries)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
                     Expanded(child: Text(entry.key)),
-                    _statBar(context, entry.value),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 28,
-                      child: Text(
-                        '${entry.value}',
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                    _labelChip(context, entry.value),
                   ],
                 ),
               ),
             const SizedBox(height: 24),
             OutlinedButton(
               onPressed: null,
-              child: const Text('Offer for Trade'),
+              child: Text(isFreeAgents ? 'Sign Player' : 'Request Trade'),
             ),
           ],
         );
@@ -257,48 +254,31 @@ class _PlayerDetailSheet extends StatelessWidget {
     );
   }
 
-  Widget _compositeDisplay(BuildContext context, double composite) {
-    final color = composite >= 83
-        ? Colors.purple
-        : composite >= 73
-            ? Colors.green
-            : composite >= 63
-                ? Colors.blue
-                : composite >= 50
-                    ? Colors.orange
-                    : Colors.grey;
+  Widget _compositeDisplay(BuildContext context, String label) {
+    final color = _labelColor(label);
     return Column(
       children: [
         Text(
-          composite.toStringAsFixed(1),
-          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color),
+          label,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
         ),
         Text('OVR', style: Theme.of(context).textTheme.labelSmall),
       ],
     );
   }
 
-  Widget _statBar(BuildContext context, int value) {
-    final fraction = ((value - 30) / 65).clamp(0.0, 1.0);
-    final color = value >= 83
-        ? Colors.purple
-        : value >= 73
-            ? Colors.green
-            : value >= 63
-                ? Colors.blue
-                : value >= 50
-                    ? Colors.orange
-                    : Colors.grey;
-    return SizedBox(
-      width: 120,
-      height: 6,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(3),
-        child: LinearProgressIndicator(
-          value: fraction,
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          valueColor: AlwaysStoppedAnimation(color),
-        ),
+  Widget _labelChip(BuildContext context, String label) {
+    final color = _labelColor(label);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }

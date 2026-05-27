@@ -4,8 +4,11 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
+import 'roster_screen.dart';
+import 'scout_screen.dart';
 
 class _StandingRow {
+  final String teamId;
   final String name;
   final String conference;
   final String division;
@@ -14,7 +17,8 @@ class _StandingRow {
   final int pointDifferential;
 
   _StandingRow.fromJson(Map<String, dynamic> j)
-      : name = j['name'],
+      : teamId = j['team_id'],
+        name = j['name'],
         conference = j['conference'],
         division = j['division'],
         wins = j['wins'],
@@ -24,7 +28,8 @@ class _StandingRow {
 
 class StandingsScreen extends StatefulWidget {
   final String leagueId;
-  const StandingsScreen({super.key, required this.leagueId});
+  final String myTeamId;
+  const StandingsScreen({super.key, required this.leagueId, required this.myTeamId});
 
   @override
   State<StandingsScreen> createState() => _StandingsScreenState();
@@ -108,46 +113,120 @@ class _StandingsScreenState extends State<StandingsScreen> {
   }
 
   Widget _buildDivisionTable(List<_StandingRow> rows) {
-    final headerStyle = const TextStyle(fontWeight: FontWeight.bold);
-    final headerBg = Theme.of(context).colorScheme.surfaceContainerHighest;
+    const headerStyle = TextStyle(fontWeight: FontWeight.bold, fontSize: 12);
 
-    return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(3),
-        1: FixedColumnWidth(36),
-        2: FixedColumnWidth(36),
-        3: FixedColumnWidth(48),
-      },
+    return Column(
       children: [
-        TableRow(
-          decoration: BoxDecoration(color: headerBg),
-          children: [
-            Padding(padding: const EdgeInsets.all(6), child: Text('Team', style: headerStyle)),
-            Padding(padding: const EdgeInsets.all(6), child: Text('W', style: headerStyle)),
-            Padding(padding: const EdgeInsets.all(6), child: Text('L', style: headerStyle)),
-            Padding(padding: const EdgeInsets.all(6), child: Text('+/-', style: headerStyle)),
-          ],
+        Container(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: _tableRow(
+            isHeader: true,
+            teamName: 'Team',
+            w: 'W',
+            l: 'L',
+            diff: '+/-',
+            nameStyle: headerStyle,
+            diffColor: null,
+          ),
         ),
         for (final row in rows)
-          TableRow(children: [
-            Padding(padding: const EdgeInsets.all(6), child: Text(row.name)),
-            Padding(padding: const EdgeInsets.all(6), child: Text('${row.wins}')),
-            Padding(padding: const EdgeInsets.all(6), child: Text('${row.losses}')),
-            Padding(
-              padding: const EdgeInsets.all(6),
-              child: Text(
-                '${row.pointDifferential > 0 ? '+' : ''}${row.pointDifferential}',
-                style: TextStyle(
-                  color: row.pointDifferential > 0
-                      ? Colors.green
-                      : row.pointDifferential < 0
-                          ? Colors.red
-                          : null,
-                ),
-              ),
+          InkWell(
+            onTap: () => _onTeamTap(row),
+            child: _tableRow(
+              teamName: row.name,
+              w: '${row.wins}',
+              l: '${row.losses}',
+              diff: '${row.pointDifferential > 0 ? '+' : ''}${row.pointDifferential}',
+              nameStyle: row.teamId == widget.myTeamId
+                  ? TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)
+                  : null,
+              diffColor: row.pointDifferential > 0
+                  ? Colors.green
+                  : row.pointDifferential < 0
+                      ? Colors.red
+                      : null,
             ),
-          ]),
+          ),
       ],
     );
+  }
+
+  Widget _tableRow({
+    bool isHeader = false,
+    required String teamName,
+    required String w,
+    required String l,
+    required String diff,
+    TextStyle? nameStyle,
+    Color? diffColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Text(teamName, style: nameStyle),
+            ),
+          ),
+          SizedBox(
+            width: 36,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Text(w, style: isHeader ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 12) : null),
+            ),
+          ),
+          SizedBox(
+            width: 36,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Text(l, style: isHeader ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 12) : null),
+            ),
+          ),
+          SizedBox(
+            width: 52,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Text(
+                diff,
+                style: isHeader
+                    ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)
+                    : TextStyle(color: diffColor),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onTeamTap(_StandingRow row) {
+    final auth = context.read<AuthProvider>();
+    if (row.teamId == widget.myTeamId) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RosterScreen(
+            leagueId: widget.leagueId,
+            teamId: row.teamId,
+            teamName: row.name,
+          ),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ScoutScreen(
+            leagueId: widget.leagueId,
+            teamId: row.teamId,
+            title: row.name,
+            myTeamId: auth.teamId!,
+          ),
+        ),
+      );
+    }
   }
 }
