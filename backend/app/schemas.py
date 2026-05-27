@@ -168,6 +168,7 @@ class StandingRow(BaseModel):
     division:           str
     wins:               int
     losses:             int
+    ties:               int
     points_for:         int
     points_against:     int
     point_differential: int

@@ -290,6 +290,7 @@ async def get_standings(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)
             'division': t.division,
             'wins': 0,
             'losses': 0,
+            'ties': 0,
             'points_for': 0,
             'points_against': 0,
         }
@@ -313,9 +314,12 @@ async def get_standings(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)
         if g.home_score > g.away_score:
             home['wins'] += 1
             away['losses'] += 1
-        else:
+        elif g.away_score > g.home_score:
             away['wins'] += 1
             home['losses'] += 1
+        else:
+            home['ties'] += 1
+            away['ties'] += 1
 
     standing_list = [
         StandingRow(**r, point_differential=r['points_for'] - r['points_against'])

@@ -93,6 +93,7 @@ async def play_game(db: AsyncSession, game: Game, home_team, away_team, games_re
     home_score, away_score, home_outcomes, away_outcomes = simulate_game(
         build_game_day_sim_team(home_sim),
         build_game_day_sim_team(away_sim),
+        is_playoff=game.is_playoff,
     )
 
     tick_injuries(home_sim)

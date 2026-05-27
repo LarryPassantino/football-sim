@@ -14,6 +14,7 @@ class _StandingRow {
   final String division;
   final int wins;
   final int losses;
+  final int ties;
   final int pointDifferential;
 
   _StandingRow.fromJson(Map<String, dynamic> j)
@@ -23,6 +24,7 @@ class _StandingRow {
         division = j['division'],
         wins = j['wins'],
         losses = j['losses'],
+        ties = j['ties'],
         pointDifferential = j['point_differential'];
 }
 
@@ -124,6 +126,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
             teamName: 'Team',
             w: 'W',
             l: 'L',
+            t: 'T',
             diff: '+/-',
             nameStyle: headerStyle,
             diffColor: null,
@@ -136,6 +139,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
               teamName: row.name,
               w: '${row.wins}',
               l: '${row.losses}',
+              t: '${row.ties}',
               diff: '${row.pointDifferential > 0 ? '+' : ''}${row.pointDifferential}',
               nameStyle: row.teamId == widget.myTeamId
                   ? TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)
@@ -156,10 +160,12 @@ class _StandingsScreenState extends State<StandingsScreen> {
     required String teamName,
     required String w,
     required String l,
+    required String t,
     required String diff,
     TextStyle? nameStyle,
     Color? diffColor,
   }) {
+    final boldSmall = isHeader ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 12) : null;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
@@ -171,30 +177,14 @@ class _StandingsScreenState extends State<StandingsScreen> {
               child: Text(teamName, style: nameStyle),
             ),
           ),
-          SizedBox(
-            width: 36,
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Text(w, style: isHeader ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 12) : null),
-            ),
-          ),
-          SizedBox(
-            width: 36,
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Text(l, style: isHeader ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 12) : null),
-            ),
-          ),
+          SizedBox(width: 36, child: Padding(padding: const EdgeInsets.all(6), child: Text(w, style: boldSmall))),
+          SizedBox(width: 36, child: Padding(padding: const EdgeInsets.all(6), child: Text(l, style: boldSmall))),
+          SizedBox(width: 36, child: Padding(padding: const EdgeInsets.all(6), child: Text(t, style: boldSmall))),
           SizedBox(
             width: 52,
             child: Padding(
               padding: const EdgeInsets.all(6),
-              child: Text(
-                diff,
-                style: isHeader
-                    ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)
-                    : TextStyle(color: diffColor),
-              ),
+              child: Text(diff, style: isHeader ? boldSmall : TextStyle(color: diffColor)),
             ),
           ),
         ],

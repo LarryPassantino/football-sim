@@ -275,7 +275,9 @@ def game_day_version(team):
 # GAME SIMULATION
 # ============================================================
 
-def simulate_game(team_a, team_b):
+OT_PERIODS = 2  # max extra periods before a tie is declared
+
+def simulate_game(team_a, team_b, is_playoff=False):
     a = game_day_version(team_a)
     b = game_day_version(team_b)
 
@@ -291,6 +293,29 @@ def simulate_game(team_a, team_b):
         out, pts = resolve_drive(b, a)
         score_b += pts
         outcomes_b[out] += 1
+
+    # Overtime: each team gets one drive per period, stop when someone leads
+    for _ in range(OT_PERIODS):
+        if score_a != score_b:
+            break
+        out, pts = resolve_drive(a, b)
+        score_a += pts
+        outcomes_a[out] += 1
+
+        out, pts = resolve_drive(b, a)
+        score_b += pts
+        outcomes_b[out] += 1
+
+    # Playoff games can't end in a tie — keep going until someone leads
+    if is_playoff:
+        while score_a == score_b:
+            out, pts = resolve_drive(a, b)
+            score_a += pts
+            outcomes_a[out] += 1
+
+            out, pts = resolve_drive(b, a)
+            score_b += pts
+            outcomes_b[out] += 1
 
     return score_a, score_b, outcomes_a, outcomes_b
 
