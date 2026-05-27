@@ -65,7 +65,9 @@ class _TeamPickerScreenState extends State<TeamPickerScreen> {
     setState(() { _claiming = teamId; });
     try {
       await context.read<AuthProvider>().claimTeam(widget.leagueId, teamId);
-      // AuthProvider notifies listeners → main.dart rebuilds to LeaguesScreen
+      if (mounted) {
+        Navigator.popUntil(context, (r) => r.isFirst);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

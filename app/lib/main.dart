@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
-import 'screens/league_browser_screen.dart';
-import 'screens/leagues_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/team_hub_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,8 +34,7 @@ class FootballSimApp extends StatelessWidget {
       home: Builder(builder: (context) {
         final auth = context.watch<AuthProvider>();
         if (!auth.isLoggedIn) return const LoginScreen();
-        if (auth.teamId == null) return const LeagueBrowserScreen();
-        return const LeaguesScreen();
+        return const TeamHubScreen();
       }),
     );
   }

@@ -94,6 +94,17 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setActiveTeam(String teamId, String leagueId, String teamName) async {
+    _teamId   = teamId;
+    _leagueId = leagueId;
+    _teamName = teamName;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('team_id', teamId);
+    await prefs.setString('league_id', leagueId);
+    await prefs.setString('team_name', teamName);
+    notifyListeners();
+  }
+
   Future<void> claimTeam(String leagueId, String teamId) async {
     final res = await http.post(
       Uri.parse('$kBaseUrl/leagues/$leagueId/teams/$teamId/claim'),
