@@ -178,6 +178,11 @@ class StandingsResponse(BaseModel):
     standings: list[StandingRow]
 
 
+class PlayerStatsResponse(BaseModel):
+    ytd:    dict[str, int]
+    career: dict[str, int]
+
+
 class CoachTeamItem(BaseModel):
     team_id:    uuid.UUID
     team_name:  str

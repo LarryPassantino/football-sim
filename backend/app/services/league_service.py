@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict
 from functools import cmp_to_key
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,7 +13,7 @@ from sim.season_sim import build_schedule
 
 from ..models import (
     Game, GameStatus, League, LeagueStatus,
-    Player, Season, SeasonStatus, Team,
+    Player, PlayerGameStats, Season, SeasonStatus, Team,
 )
 from .sim_bridge import clear_all_injuries, play_game
 
@@ -327,19 +327,49 @@ async def _advance_playoff_week(db: AsyncSession, season: Season) -> dict:
 # END SEASON
 # ============================================================
 
-async def end_season(db: AsyncSession, league_id: uuid.UUID) -> None:
-    """Clear injuries and move league to offseason."""
-    await clear_all_injuries(db, league_id)
+_STAT_FIELDS = [
+    'pass_attempts', 'pass_completions', 'pass_yards', 'pass_tds', 'interceptions_thrown',
+    'rush_attempts', 'rush_yards', 'rush_tds',
+    'receptions', 'receiving_yards', 'receiving_tds',
+    'fumbles', 'fumbles_lost', 'sacks_allowed',
+    'tackles', 'sacks', 'interceptions', 'forced_fumbles', 'fumble_recoveries',
+]
 
+
+async def end_season(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """Accumulate season stats into career totals, clear injuries, move league to offseason."""
     result = await db.execute(select(League).where(League.id == league_id))
     league = result.scalar_one()
-    league.status = LeagueStatus.offseason
 
     result = await db.execute(
         select(Season).where(Season.league_id == league_id, Season.status != SeasonStatus.complete)
     )
     season = result.scalar_one_or_none()
+
     if season:
+        # Aggregate all PlayerGameStats for this season grouped by player
+        agg_result = await db.execute(
+            select(
+                PlayerGameStats.player_id,
+                *[func.sum(getattr(PlayerGameStats, f)).label(f) for f in _STAT_FIELDS],
+            )
+            .join(Game, PlayerGameStats.game_id == Game.id)
+            .where(Game.season_id == season.id)
+            .group_by(PlayerGameStats.player_id)
+        )
+        rows = agg_result.all()
+
+        for row in rows:
+            player = await db.get(Player, row.player_id)
+            if not player:
+                continue
+            career = dict(player.career_stats or {})
+            for f in _STAT_FIELDS:
+                career[f] = career.get(f, 0) + int(getattr(row, f) or 0)
+            player.career_stats = career
+
         season.status = SeasonStatus.complete
 
+    await clear_all_injuries(db, league_id)
+    league.status = LeagueStatus.offseason
     await db.commit()

@@ -183,17 +183,126 @@ class _RosterScreenState extends State<RosterScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _PlayerDetailSheet(player: player),
+      builder: (_) => _PlayerDetailSheet(player: player, leagueId: widget.leagueId),
     );
   }
 }
 
-class _PlayerDetailSheet extends StatelessWidget {
+// ── Stat formatting helpers ───────────────────────────────────────────────────
+
+String _fmtN(int n) {
+  if (n >= 1000) return '${n ~/ 1000},${(n % 1000).toString().padLeft(3, '0')}';
+  return '$n';
+}
+
+String _formatStatLine(String position, Map<String, int> s) {
+  final parts = <String>[];
+
+  String? passing() {
+    final att = s['pass_attempts'] ?? 0;
+    if (att == 0) return null;
+    final comp = s['pass_completions'] ?? 0;
+    final td   = s['pass_tds'] ?? 0;
+    final int_ = s['interceptions_thrown'] ?? 0;
+    return '$comp/$att, ${_fmtN(s['pass_yards'] ?? 0)} yds, $td TD, $int_ INT';
+  }
+
+  String? rushing() {
+    final car = s['rush_attempts'] ?? 0;
+    if (car == 0) return null;
+    final td = s['rush_tds'] ?? 0;
+    return '$car car, ${_fmtN(s['rush_yards'] ?? 0)} yds, $td TD';
+  }
+
+  String? receiving() {
+    final rec = s['receptions'] ?? 0;
+    final yds = s['receiving_yards'] ?? 0;
+    if (rec == 0 && yds == 0) return null;
+    final td = s['receiving_tds'] ?? 0;
+    return '$rec rec, ${_fmtN(yds)} yds, $td TD';
+  }
+
+  String? defense() {
+    final tkl = s['tackles'] ?? 0;
+    final sck = s['sacks'] ?? 0;
+    final int_ = s['interceptions'] ?? 0;
+    final ff  = s['forced_fumbles'] ?? 0;
+    final fr  = s['fumble_recoveries'] ?? 0;
+    if (tkl == 0 && sck == 0 && int_ == 0 && ff == 0 && fr == 0) return null;
+    final p = <String>[];
+    if (tkl > 0) p.add('$tkl tkl');
+    if (sck > 0) p.add('$sck sck');
+    if (int_ > 0) p.add('$int_ INT');
+    if (ff > 0) p.add('$ff FF');
+    if (fr > 0) p.add('$fr FR');
+    return p.join(', ');
+  }
+
+  switch (position) {
+    case 'QB':
+      final p = passing();   if (p != null) parts.add(p);
+      final r = rushing();   if (r != null) parts.add(r);
+      final c = receiving(); if (c != null) parts.add(c);
+    case 'RB':
+      final r = rushing();   if (r != null) parts.add(r);
+      final c = receiving(); if (c != null) parts.add(c);
+      final p = passing();   if (p != null) parts.add(p);
+    case 'WR' || 'TE':
+      final c = receiving(); if (c != null) parts.add(c);
+      final r = rushing();   if (r != null) parts.add(r);
+    case 'OL':
+      final sa = s['sacks_allowed'] ?? 0;
+      if (sa > 0) parts.add('$sa sacks allowed');
+    case 'DT' || 'DE' || 'LB' || 'CB' || 'S':
+      final d = defense(); if (d != null) parts.add(d);
+    default:
+      return '—';
+  }
+
+  return parts.isEmpty ? '—' : parts.join('  ·  ');
+}
+
+// ── Player detail sheet ───────────────────────────────────────────────────────
+
+class _PlayerDetailSheet extends StatefulWidget {
   final _Player player;
-  const _PlayerDetailSheet({required this.player});
+  final String leagueId;
+  const _PlayerDetailSheet({required this.player, required this.leagueId});
+
+  @override
+  State<_PlayerDetailSheet> createState() => _PlayerDetailSheetState();
+}
+
+class _PlayerDetailSheetState extends State<_PlayerDetailSheet> {
+  Map<String, int>? _ytd;
+  Map<String, int>? _career;
+  bool _loadingStats = false;
+  String? _statsError;
+
+  Future<void> _loadStats() async {
+    setState(() { _loadingStats = true; _statsError = null; });
+    try {
+      final auth = context.read<AuthProvider>();
+      final res = await http.get(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/players/${widget.player.id}/stats'),
+        headers: auth.authHeaders,
+      );
+      if (res.statusCode != 200) throw Exception('Failed to load stats');
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      setState(() {
+        _ytd    = (data['ytd']    as Map<String, dynamic>).map((k, v) => MapEntry(k, v as int));
+        _career = (data['career'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as int));
+      });
+    } catch (e) {
+      setState(() { _statsError = e.toString().replaceFirst('Exception: ', ''); });
+    } finally {
+      setState(() { _loadingStats = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final player = widget.player;
     return DraggableScrollableSheet(
       initialChildSize: 0.55,
       minChildSize: 0.4,
@@ -246,6 +355,24 @@ class _PlayerDetailSheet extends StatelessWidget {
                   ],
                 ),
               ),
+            const Divider(height: 32),
+            if (_ytd == null && !_loadingStats)
+              OutlinedButton(
+                onPressed: _loadStats,
+                child: const Text('Show Stats'),
+              )
+            else if (_loadingStats)
+              const Center(child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: CircularProgressIndicator(),
+              ))
+            else if (_statsError != null)
+              Text(_statsError!, style: const TextStyle(color: Colors.red))
+            else ...[
+              _statSummaryRow(context, 'YTD',    _ytd!,    player.position),
+              const SizedBox(height: 8),
+              _statSummaryRow(context, 'Career', _career!, player.position),
+            ],
             const SizedBox(height: 24),
             OutlinedButton(
               onPressed: null,
@@ -254,6 +381,33 @@ class _PlayerDetailSheet extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  Widget _statSummaryRow(
+    BuildContext context,
+    String label,
+    Map<String, int> stats,
+    String position,
+  ) {
+    final line = _formatStatLine(position, stats);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 52,
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(line, style: Theme.of(context).textTheme.bodySmall),
+        ),
+      ],
     );
   }
 

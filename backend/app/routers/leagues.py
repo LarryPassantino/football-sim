@@ -7,12 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_coach, get_db
 from sim.player_gen import POSITION_STATS, assign_label
+from sqlalchemy import func
 from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
     AvailableLeaguesResponse, GameDetailResponse, GameResponse, LeagueAvailableItem,
     LeagueCreateRequest, LeagueDetailResponse, LeagueResponse, PlayerRosterItem,
-    PlayerScoutItem, PlayerStatLine, StandingRow, StandingsResponse, TeamPickerItem,
-    TeamResponse,
+    PlayerScoutItem, PlayerStatLine, PlayerStatsResponse, StandingRow, StandingsResponse,
+    TeamPickerItem, TeamResponse,
 )
 from ..services.league_service import create_league
 
@@ -328,3 +329,49 @@ async def get_standings(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)
     standing_list.sort(key=lambda r: (r.conference, r.division, -r.wins, -r.point_differential))
 
     return StandingsResponse(standings=standing_list)
+
+
+# Stat fields shared between YTD aggregation and career accumulation
+_STAT_FIELDS = [
+    'pass_attempts', 'pass_completions', 'pass_yards', 'pass_tds', 'interceptions_thrown',
+    'rush_attempts', 'rush_yards', 'rush_tds',
+    'receptions', 'receiving_yards', 'receiving_tds',
+    'fumbles', 'fumbles_lost', 'sacks_allowed',
+    'tackles', 'sacks', 'interceptions', 'forced_fumbles', 'fumble_recoveries',
+]
+
+
+@router.get('/{league_id}/players/{player_id}/stats', response_model=PlayerStatsResponse)
+async def get_player_stats(
+    league_id: uuid.UUID,
+    player_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    player = await db.get(Player, player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail='Player not found')
+
+    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    season = result.scalar_one_or_none()
+
+    ytd: dict[str, int] = {f: 0 for f in _STAT_FIELDS}
+    if season:
+        agg = await db.execute(
+            select(*[
+                func.coalesce(func.sum(getattr(PlayerGameStats, f)), 0).label(f)
+                for f in _STAT_FIELDS
+            ])
+            .join(Game, PlayerGameStats.game_id == Game.id)
+            .where(
+                PlayerGameStats.player_id == player_id,
+                Game.season_id == season.id,
+            )
+        )
+        row = agg.one_or_none()
+        if row:
+            ytd = {f: getattr(row, f) for f in _STAT_FIELDS}
+
+    return PlayerStatsResponse(
+        ytd=ytd,
+        career={f: int(player.career_stats.get(f, 0)) for f in _STAT_FIELDS},
+    )
