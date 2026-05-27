@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
+import 'game_detail_screen.dart';
 import 'roster_screen.dart';
 import 'schedule_screen.dart';
 import 'scout_screen.dart';
@@ -33,6 +34,7 @@ class _MyRecord {
 class _GameSummary {
   final String gameId;
   final bool isHome;
+  final String opponentId;
   final String opponentName;
   final int? myScore;
   final int? opponentScore;
@@ -42,6 +44,7 @@ class _GameSummary {
   _GameSummary({
     required this.gameId,
     required this.isHome,
+    required this.opponentId,
     required this.opponentName,
     required this.myScore,
     required this.opponentScore,
@@ -127,6 +130,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
               gameSummary = _GameSummary(
                 gameId: game['id'] as String,
                 isHome: isHome,
+                opponentId: oppId,
                 opponentName: teamNames[oppId] ?? 'Unknown',
                 myScore: isPlayed ? (isHome ? game['home_score'] : game['away_score']) as int? : null,
                 opponentScore: isPlayed ? (isHome ? game['away_score'] : game['home_score']) as int? : null,
@@ -302,11 +306,30 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             if (game == null)
               const Text('No game this week')
             else if (game.isPlayed)
-              _buildScoreLine(game)
+              GestureDetector(
+                onTap: () {
+                  final auth = context.read<AuthProvider>();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GameDetailScreen(
+                        leagueId: auth.leagueId!,
+                        gameId: game.gameId,
+                      ),
+                    ),
+                  );
+                },
+                child: _buildScoreLine(game),
+              )
             else
-              Text(
-                '${game.isHome ? 'vs' : '@'} ${game.opponentName}',
-                style: Theme.of(context).textTheme.titleMedium,
+              Row(
+                children: [
+                  Text(
+                    '${game.isHome ? 'vs' : '@'}  ',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  _opponentLink(game),
+                ],
               ),
           ],
         ),
@@ -315,24 +338,51 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
   }
 
   Widget _buildScoreLine(_GameSummary game) {
-    final won = (game.myScore ?? 0) > (game.opponentScore ?? 0);
+    final myScore  = game.myScore  ?? 0;
+    final oppScore = game.opponentScore ?? 0;
+    final won  = myScore > oppScore;
+    final lost = myScore < oppScore;
     return Row(
       children: [
         Text(
-          won ? 'W' : 'L',
+          won ? 'W' : lost ? 'L' : 'T',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: won ? Colors.green : Colors.red,
+            color: won ? Colors.green : lost ? Colors.red : Colors.grey,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            '${game.myScore}–${game.opponentScore}  ${game.isHome ? 'vs' : '@'} ${game.opponentName}',
-            style: Theme.of(context).textTheme.titleMedium,
+        Text(
+          '${game.myScore}–${game.opponentScore}  ${game.isHome ? 'vs' : '@'}  ',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        _opponentLink(game),
+      ],
+    );
+  }
+
+  Widget _opponentLink(_GameSummary game) {
+    final auth = context.read<AuthProvider>();
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ScoutScreen(
+            leagueId: auth.leagueId!,
+            teamId: game.opponentId,
+            title: game.opponentName,
+            myTeamId: auth.teamId!,
           ),
         ),
-      ],
+      ),
+      child: Text(
+        game.opponentName,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          decoration: TextDecoration.underline,
+          decorationColor: Theme.of(context).colorScheme.primary,
+        ),
+      ),
     );
   }
 

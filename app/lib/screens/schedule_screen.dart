@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
+import 'game_detail_screen.dart';
 import 'roster_screen.dart';
 import 'scout_screen.dart';
 
@@ -144,11 +145,26 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final oppScore = game.homeTeamId == widget.myTeamId ? game.awayScore : game.homeScore;
       final won = isMyGame && (myScore ?? 0) > (oppScore ?? 0);
       final lost = isMyGame && (myScore ?? 0) < (oppScore ?? 0);
-      scoreWidget = Text(
-        '${game.homeScore}–${game.awayScore}',
-        style: TextStyle(
-          fontWeight: isMyGame ? FontWeight.bold : FontWeight.normal,
-          color: isMyGame ? (won ? Colors.green : lost ? Colors.red : null) : null,
+      scoreWidget = GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GameDetailScreen(
+              leagueId: widget.leagueId,
+              gameId: game.id,
+            ),
+          ),
+        ),
+        child: Text(
+          '${game.homeScore}–${game.awayScore}',
+          style: TextStyle(
+            fontWeight: isMyGame ? FontWeight.bold : FontWeight.normal,
+            color: isMyGame ? (won ? Colors.green : lost ? Colors.red : null) : null,
+            decoration: TextDecoration.underline,
+            decorationColor: isMyGame
+                ? (won ? Colors.green : lost ? Colors.red : null)
+                : null,
+          ),
         ),
       );
     } else {
