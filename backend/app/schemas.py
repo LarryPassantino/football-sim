@@ -121,6 +121,16 @@ class GameDetailResponse(BaseModel):
     away_stats:     list[PlayerStatLine]
 
 
+class PlayerRosterItem(BaseModel):
+    id:                     uuid.UUID
+    name:                   str
+    position:               str
+    age:                    int
+    composite:              float
+    named_stats:            dict[str, int]
+    injury_games_remaining: int
+
+
 class LeagueAvailableItem(BaseModel):
     id:                uuid.UUID
     name:              str

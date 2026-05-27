@@ -6,11 +6,12 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_coach, get_db
+from sim.player_gen import POSITION_STATS
 from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
     AvailableLeaguesResponse, GameDetailResponse, GameResponse, LeagueAvailableItem,
-    LeagueCreateRequest, LeagueDetailResponse, LeagueResponse, PlayerStatLine,
-    StandingRow, StandingsResponse, TeamPickerItem, TeamResponse,
+    LeagueCreateRequest, LeagueDetailResponse, LeagueResponse, PlayerRosterItem,
+    PlayerStatLine, StandingRow, StandingsResponse, TeamPickerItem, TeamResponse,
 )
 from ..services.league_service import create_league
 
@@ -119,6 +120,28 @@ async def claim_team(
     team.is_cpu   = False
     await db.commit()
     return team
+
+
+@router.get('/{league_id}/teams/{team_id}/roster', response_model=list[PlayerRosterItem])
+async def get_roster(league_id: uuid.UUID, team_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Player)
+        .where(Player.team_id == team_id)
+        .order_by(Player.position, Player.composite.desc())
+    )
+    items = []
+    for p in result.scalars().all():
+        stat_names = POSITION_STATS.get(p.position, [])
+        items.append(PlayerRosterItem(
+            id=p.id,
+            name=p.name,
+            position=p.position,
+            age=p.age,
+            composite=p.composite,
+            named_stats={name: val for name, val in zip(stat_names, p.stats)},
+            injury_games_remaining=p.injury_games_remaining,
+        ))
+    return items
 
 
 @router.get('/{league_id}/schedule', response_model=list[GameResponse])

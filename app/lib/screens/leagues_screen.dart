@@ -4,8 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
-import 'standings_screen.dart';
+import 'roster_screen.dart';
 import 'schedule_screen.dart';
+import 'standings_screen.dart';
 
 class _LeagueDetail {
   final String name;
@@ -177,6 +178,21 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         const SizedBox(height: 16),
         _buildCurrentGameCard(),
         const SizedBox(height: 24),
+        FilledButton.icon(
+          icon: const Icon(Icons.people),
+          label: const Text('Roster'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RosterScreen(
+                leagueId: leagueId,
+                teamId: auth.teamId!,
+                teamName: auth.teamName ?? 'My Team',
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         FilledButton.icon(
           icon: const Icon(Icons.bar_chart),
           label: const Text('Standings'),
