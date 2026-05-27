@@ -9,8 +9,8 @@ from ..dependencies import get_current_coach, get_db
 from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
     AvailableLeaguesResponse, GameDetailResponse, GameResponse, LeagueAvailableItem,
-    LeagueCreateRequest, LeagueResponse, PlayerStatLine, StandingRow, StandingsResponse,
-    TeamPickerItem, TeamResponse,
+    LeagueCreateRequest, LeagueDetailResponse, LeagueResponse, PlayerStatLine,
+    StandingRow, StandingsResponse, TeamPickerItem, TeamResponse,
 )
 from ..services.league_service import create_league
 
@@ -68,12 +68,21 @@ async def new_league(
     return league
 
 
-@router.get('/{league_id}', response_model=LeagueResponse)
+@router.get('/{league_id}', response_model=LeagueDetailResponse)
 async def get_league(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     league = await db.get(League, league_id)
     if not league:
         raise HTTPException(status_code=404, detail='League not found')
-    return league
+    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    season = result.scalar_one_or_none()
+    return LeagueDetailResponse(
+        id=league.id,
+        name=league.name,
+        status=league.status,
+        current_week=season.current_week if season else None,
+        season_status=season.status.value if season else None,
+        created_at=league.created_at,
+    )
 
 
 @router.get('/{league_id}/teams', response_model=list[TeamResponse])

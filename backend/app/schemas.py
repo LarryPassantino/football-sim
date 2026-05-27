@@ -37,6 +37,15 @@ class LeagueResponse(BaseModel):
     model_config = {'from_attributes': True}
 
 
+class LeagueDetailResponse(BaseModel):
+    id:            uuid.UUID
+    name:          str
+    status:        str
+    current_week:  int | None
+    season_status: str | None
+    created_at:    datetime
+
+
 class TeamResponse(BaseModel):
     id: uuid.UUID
     name: str

@@ -8,10 +8,12 @@ class AuthProvider extends ChangeNotifier {
   String? _accessToken;
   String? _leagueId;
   String? _teamId;
+  String? _teamName;
 
   bool get isLoggedIn => _accessToken != null;
   String? get leagueId => _leagueId;
   String? get teamId => _teamId;
+  String? get teamName => _teamName;
 
   Map<String, String> get authHeaders => {
     'Content-Type': 'application/json',
@@ -31,6 +33,7 @@ class AuthProvider extends ChangeNotifier {
     _accessToken = prefs.getString('access_token');
     _leagueId    = prefs.getString('league_id');
     _teamId      = prefs.getString('team_id');
+    _teamName    = prefs.getString('team_name');
   }
 
   Future<void> login(String email, String password) async {
@@ -71,11 +74,14 @@ class AuthProvider extends ChangeNotifier {
       headers: authHeaders,
     );
     if (res.statusCode != 200) throw Exception(_errorDetail(res.body));
-    _leagueId = leagueId;
-    _teamId   = teamId;
+    final data = jsonDecode(res.body);
+    _leagueId  = leagueId;
+    _teamId    = teamId;
+    _teamName  = data['name'] as String?;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('league_id', leagueId);
     await prefs.setString('team_id', teamId);
+    if (_teamName != null) await prefs.setString('team_name', _teamName!);
     notifyListeners();
   }
 
@@ -83,10 +89,12 @@ class AuthProvider extends ChangeNotifier {
     _accessToken = null;
     _leagueId    = null;
     _teamId      = null;
+    _teamName    = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
     await prefs.remove('league_id');
     await prefs.remove('team_id');
+    await prefs.remove('team_name');
     notifyListeners();
   }
 }
