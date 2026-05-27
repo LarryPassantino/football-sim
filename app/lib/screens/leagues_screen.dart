@@ -23,10 +23,11 @@ class _LeagueDetail {
 class _MyRecord {
   final int wins;
   final int losses;
+  final int ties;
   final String conference;
   final String division;
 
-  _MyRecord({required this.wins, required this.losses, required this.conference, required this.division});
+  _MyRecord({required this.wins, required this.losses, required this.ties, required this.conference, required this.division});
 }
 
 class _GameSummary {
@@ -99,6 +100,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
           record = _MyRecord(
             wins: r['wins'],
             losses: r['losses'],
+            ties: r['ties'],
             conference: r['conference'],
             division: r['division'],
           );
@@ -268,7 +270,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             ),
             if (record != null)
               Text(
-                '${record.wins}–${record.losses}',
+                '${record.wins}–${record.losses}–${record.ties}',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
