@@ -6,6 +6,7 @@ import '../config.dart';
 
 class AuthProvider extends ChangeNotifier {
   String? _accessToken;
+  String? _refreshToken;
   String? _leagueId;
   String? _teamId;
   String? _teamName;
@@ -30,12 +31,44 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _accessToken = prefs.getString('access_token');
-    _leagueId    = prefs.getString('league_id');
-    _teamId      = prefs.getString('team_id');
-    _teamName    = prefs.getString('team_name');
-    if (_accessToken != null && _teamId == null) {
+    _accessToken  = prefs.getString('access_token');
+    _refreshToken = prefs.getString('refresh_token');
+    _leagueId     = prefs.getString('league_id');
+    _teamId       = prefs.getString('team_id');
+    _teamName     = prefs.getString('team_name');
+
+    if (_refreshToken != null) {
+      // Silently refresh on every cold start so the access token is always fresh.
+      final ok = await _doRefresh();
+      if (ok && _teamId == null) await _restoreTeam();
+    } else if (_accessToken != null && _teamId == null) {
       await _restoreTeam();
+    }
+  }
+
+  // Returns true on success, calls logout() and returns false on failure.
+  Future<bool> _doRefresh() async {
+    if (_refreshToken == null) return false;
+    try {
+      final res = await http.post(
+        Uri.parse('$kBaseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
+      if (res.statusCode != 200) {
+        await logout();
+        return false;
+      }
+      final data = jsonDecode(res.body);
+      _accessToken  = data['access_token'] as String;
+      _refreshToken = data['refresh_token'] as String;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('access_token', _accessToken!);
+      await prefs.setString('refresh_token', _refreshToken!);
+      return true;
+    } catch (_) {
+      await logout();
+      return false;
     }
   }
 
@@ -60,6 +93,14 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> _saveTokens(Map<String, dynamic> data) async {
+    _accessToken  = data['access_token'] as String;
+    _refreshToken = data['refresh_token'] as String;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('access_token', _accessToken!);
+    await prefs.setString('refresh_token', _refreshToken!);
+  }
+
   Future<void> login(String email, String password) async {
     final res = await http.post(
       Uri.parse('$kBaseUrl/auth/login'),
@@ -67,10 +108,7 @@ class AuthProvider extends ChangeNotifier {
       body: jsonEncode({'email': email, 'password': password}),
     );
     if (res.statusCode != 200) throw Exception(_errorDetail(res.body));
-    final data = jsonDecode(res.body);
-    _accessToken = data['access_token'] as String;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('access_token', _accessToken!);
+    await _saveTokens(jsonDecode(res.body));
     await _restoreTeam();
     notifyListeners();
   }
@@ -86,10 +124,7 @@ class AuthProvider extends ChangeNotifier {
       }),
     );
     if (res.statusCode != 201) throw Exception(_errorDetail(res.body));
-    final data = jsonDecode(res.body);
-    _accessToken = data['access_token'] as String;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('access_token', _accessToken!);
+    await _saveTokens(jsonDecode(res.body));
     await _restoreTeam();
     notifyListeners();
   }
@@ -123,12 +158,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    _accessToken = null;
-    _leagueId    = null;
-    _teamId      = null;
-    _teamName    = null;
+    _accessToken  = null;
+    _refreshToken = null;
+    _leagueId     = null;
+    _teamId       = null;
+    _teamName     = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
     await prefs.remove('league_id');
     await prefs.remove('team_id');
     await prefs.remove('team_name');

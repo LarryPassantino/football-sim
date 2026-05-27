@@ -49,7 +49,7 @@ class _TeamHubScreenState extends State<TeamHubScreen> {
         Uri.parse('$kBaseUrl/coaches/me/teams'),
         headers: auth.authHeaders,
       );
-      if (res.statusCode != 200) throw Exception('Failed to load teams');
+      if (res.statusCode != 200) throw Exception('Failed to load teams (${res.statusCode}): ${res.body}');
       final data = jsonDecode(res.body) as List;
       setState(() {
         _teams = data.map((j) => _MyTeam.fromJson(j as Map<String, dynamic>)).toList();
