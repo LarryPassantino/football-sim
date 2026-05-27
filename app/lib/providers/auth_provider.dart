@@ -34,6 +34,30 @@ class AuthProvider extends ChangeNotifier {
     _leagueId    = prefs.getString('league_id');
     _teamId      = prefs.getString('team_id');
     _teamName    = prefs.getString('team_name');
+    if (_accessToken != null && _teamId == null) {
+      await _restoreTeam();
+    }
+  }
+
+  Future<void> _restoreTeam() async {
+    if (_accessToken == null) return;
+    try {
+      final res = await http.get(
+        Uri.parse('$kBaseUrl/coaches/me/teams'),
+        headers: authHeaders,
+      );
+      if (res.statusCode != 200) return;
+      final teams = jsonDecode(res.body) as List;
+      if (teams.isEmpty) return;
+      final first = teams.first as Map<String, dynamic>;
+      _leagueId = first['league_id'] as String;
+      _teamId   = first['team_id'] as String;
+      _teamName = first['team_name'] as String;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('league_id', _leagueId!);
+      await prefs.setString('team_id', _teamId!);
+      await prefs.setString('team_name', _teamName!);
+    } catch (_) {}
   }
 
   Future<void> login(String email, String password) async {
@@ -47,6 +71,7 @@ class AuthProvider extends ChangeNotifier {
     _accessToken = data['access_token'] as String;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('access_token', _accessToken!);
+    await _restoreTeam();
     notifyListeners();
   }
 
@@ -65,6 +90,7 @@ class AuthProvider extends ChangeNotifier {
     _accessToken = data['access_token'] as String;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('access_token', _accessToken!);
+    await _restoreTeam();
     notifyListeners();
   }
 

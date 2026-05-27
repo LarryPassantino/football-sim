@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
+import 'roster_screen.dart';
+import 'scout_screen.dart';
 
 class _Game {
   final String id;
@@ -160,8 +162,60 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       color: isMyGame ? Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4) : null,
       child: ListTile(
         dense: true,
-        title: Text('$awayName  @  $homeName'),
+        title: Row(
+          children: [
+            _teamNameLink(game.awayTeamId, awayName),
+            Text(
+              '  @  ',
+              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+            ),
+            _teamNameLink(game.homeTeamId, homeName),
+          ],
+        ),
         trailing: scoreWidget,
+      ),
+    );
+  }
+
+  void _navigateToTeam(String teamId, String teamName) {
+    if (teamId == widget.myTeamId) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RosterScreen(
+            leagueId: widget.leagueId,
+            teamId: teamId,
+            teamName: teamName,
+          ),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ScoutScreen(
+            leagueId: widget.leagueId,
+            teamId: teamId,
+            title: teamName,
+            myTeamId: widget.myTeamId,
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _teamNameLink(String teamId, String teamName) {
+    final isMe = teamId == widget.myTeamId;
+    return GestureDetector(
+      onTap: () => _navigateToTeam(teamId, teamName),
+      child: Text(
+        teamName,
+        style: TextStyle(
+          fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+          color: Theme.of(context).colorScheme.primary,
+          decoration: TextDecoration.underline,
+          decorationColor: Theme.of(context).colorScheme.primary,
+        ),
       ),
     );
   }

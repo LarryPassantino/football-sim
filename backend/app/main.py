@@ -5,7 +5,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 
-from .routers import auth, leagues
+from .routers import auth, coaches, leagues
 
 
 @asynccontextmanager
@@ -16,6 +16,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title='Football Sim API', lifespan=lifespan)
 
 app.include_router(auth.router)
+app.include_router(coaches.router)
 app.include_router(leagues.router)
 
 

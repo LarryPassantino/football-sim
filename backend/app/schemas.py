@@ -175,3 +175,12 @@ class StandingRow(BaseModel):
 
 class StandingsResponse(BaseModel):
     standings: list[StandingRow]
+
+
+class CoachTeamItem(BaseModel):
+    team_id:    uuid.UUID
+    team_name:  str
+    league_id:  uuid.UUID
+    league_name: str
+    conference: str
+    division:   str
