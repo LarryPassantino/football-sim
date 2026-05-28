@@ -63,9 +63,14 @@ class ScoutScreen extends StatefulWidget {
 
 class _ScoutScreenState extends State<ScoutScreen> {
   List<_ScoutPlayer>? _players;
+  String? _selectedPosition;
   String? _error;
 
   bool get _isFreeAgents => widget.teamId == null;
+
+  static const _filterPositions = [
+    'ALL', 'QB', 'WR', 'TE', 'RB', 'OL', 'DT', 'DE', 'LB', 'CB', 'S', 'K', 'P',
+  ];
 
   @override
   void initState() {
@@ -104,13 +109,49 @@ class _ScoutScreenState extends State<ScoutScreen> {
           ? Center(child: Text(_error!))
           : _players == null
               ? const Center(child: CircularProgressIndicator())
-              : _buildRoster(),
+              : Column(
+                  children: [
+                    _buildFilterRow(),
+                    Expanded(child: _buildRoster()),
+                  ],
+                ),
+    );
+  }
+
+  Widget _buildFilterRow() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: _filterPositions.map((pos) {
+          final isAll     = pos == 'ALL';
+          final selected  = isAll ? _selectedPosition == null : _selectedPosition == pos;
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: FilterChip(
+              label: Text(pos),
+              selected: selected,
+              onSelected: (_) => setState(() => _selectedPosition = isAll ? null : pos),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
   Widget _buildRoster() {
+    final visible = _selectedPosition == null
+        ? _players!
+        : _players!.where((p) => p.position == _selectedPosition).toList();
+
+    // Flat list when filtered to a single position
+    if (_selectedPosition != null) {
+      return ListView(children: visible.map(_playerTile).toList());
+    }
+
+    // Grouped view for ALL
     final byPosition = <String, List<_ScoutPlayer>>{};
-    for (final p in _players!) {
+    for (final p in visible) {
       byPosition.putIfAbsent(p.position, () => []).add(p);
     }
 
@@ -188,18 +229,78 @@ class _ScoutScreenState extends State<ScoutScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _ScoutPlayerSheet(player: player, isFreeAgents: _isFreeAgents),
+      builder: (_) => _ScoutPlayerSheet(
+        player: player,
+        isFreeAgents: _isFreeAgents,
+        leagueId: widget.leagueId,
+        myTeamId: widget.myTeamId,
+        onSigned: () { Navigator.pop(context); _load(); },
+      ),
     );
   }
 }
 
-class _ScoutPlayerSheet extends StatelessWidget {
+class _ScoutPlayerSheet extends StatefulWidget {
   final _ScoutPlayer player;
   final bool isFreeAgents;
-  const _ScoutPlayerSheet({required this.player, required this.isFreeAgents});
+  final String leagueId;
+  final String myTeamId;
+  final VoidCallback onSigned;
+
+  const _ScoutPlayerSheet({
+    required this.player,
+    required this.isFreeAgents,
+    required this.leagueId,
+    required this.myTeamId,
+    required this.onSigned,
+  });
+
+  @override
+  State<_ScoutPlayerSheet> createState() => _ScoutPlayerSheetState();
+}
+
+class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
+  bool _signing = false;
+  String? _error;
+
+  Future<void> _signPlayer() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Sign Player'),
+        content: Text(
+          'Add ${widget.player.name} (${widget.player.position}) to your active roster?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sign')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() { _signing = true; _error = null; });
+    try {
+      final auth = context.read<AuthProvider>();
+      final res = await http.post(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.myTeamId}/sign-fa'),
+        headers: {...auth.authHeaders, 'Content-Type': 'application/json'},
+        body: jsonEncode({'player_id': widget.player.id}),
+      );
+      if (res.statusCode == 204) {
+        widget.onSigned();
+      } else {
+        final msg = jsonDecode(res.body)['detail'] ?? 'Signing failed';
+        setState(() { _error = msg; _signing = false; });
+      }
+    } catch (e) {
+      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _signing = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final player = widget.player;
     return DraggableScrollableSheet(
       initialChildSize: 0.55,
       minChildSize: 0.4,
@@ -244,10 +345,23 @@ class _ScoutPlayerSheet extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 24),
-            OutlinedButton(
-              onPressed: null,
-              child: Text(isFreeAgents ? 'Sign Player' : 'Request Trade'),
-            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              ),
+            if (widget.isFreeAgents)
+              FilledButton(
+                onPressed: _signing ? null : _signPlayer,
+                child: _signing
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Sign Player'),
+              )
+            else
+              OutlinedButton(
+                onPressed: null,
+                child: const Text('Request Trade'),
+              ),
           ],
         );
       },

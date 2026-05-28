@@ -384,9 +384,10 @@ Note: `sim/` lives inside `backend/` for Railway deployment — no sys.path hack
 | Regular season advancement (`advance_week`) | Complete |
 | Playoff bracket (seeding, 3-round bracket, tiebreakers) | Complete |
 | Per-game player stats + game detail endpoint | Complete — `GET /leagues/{id}/games/{game_id}` |
+| Matchup endpoint | Complete — `GET /leagues/{id}/games/{game_id}/matchup` |
 | Cron job (`advance_games.py`) | Complete — deployed on Railway |
 | Railway web service deploy | Complete |
-| Standings endpoint | **Next** |
+| Standings endpoint | Complete |
 
 ### Frontend
 | Area | Status |

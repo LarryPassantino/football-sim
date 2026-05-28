@@ -13,6 +13,7 @@ class _Player {
   final double composite;
   final Map<String, int> namedStats;
   final int injuryGamesRemaining;
+  final bool onIr;
 
   _Player.fromJson(Map<String, dynamic> j)
       : id = j['id'],
@@ -22,9 +23,11 @@ class _Player {
         composite = (j['composite'] as num).toDouble(),
         namedStats = (j['named_stats'] as Map<String, dynamic>)
             .map((k, v) => MapEntry(k, v as int)),
-        injuryGamesRemaining = j['injury_games_remaining'];
+        injuryGamesRemaining = j['injury_games_remaining'],
+        onIr = j['on_ir'] as bool? ?? false;
 
-  bool get isInjured => injuryGamesRemaining > 0;
+  bool get isInjured       => injuryGamesRemaining > 0;
+  bool get isReturnReady   => onIr && injuryGamesRemaining == 0;
 }
 
 const _positionGroups = {
@@ -137,20 +140,61 @@ class _RosterScreenState extends State<RosterScreen> {
   }
 
   Widget _playerTile(_Player player) {
+    String subtitle = 'Age ${player.age}';
+    if (player.isReturnReady)       subtitle += '  ·  Return ready';
+    else if (player.onIr)           subtitle += '  ·  IR · OUT ${player.injuryGamesRemaining}g';
+    else if (player.isInjured)      subtitle += '  ·  OUT ${player.injuryGamesRemaining}g';
+
     return ListTile(
       dense: true,
       title: Text(player.name),
-      subtitle: Text('Age ${player.age}${player.isInjured ? '  ·  OUT ${player.injuryGamesRemaining}g' : ''}'),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (player.isInjured)
-            const Icon(Icons.local_hospital, size: 16, color: Colors.red),
-          const SizedBox(width: 8),
-          _compositeChip(player.composite),
-        ],
+      subtitle: Text(subtitle),
+      trailing: player.isReturnReady
+          ? FilledButton.tonal(
+              onPressed: () => _showActivateDialog(player),
+              child: const Text('Activate'),
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (player.onIr)
+                  _irBadge()
+                else if (player.isInjured)
+                  const Icon(Icons.local_hospital, size: 16, color: Colors.red),
+                const SizedBox(width: 8),
+                _compositeChip(player.composite),
+              ],
+            ),
+      onTap: player.isReturnReady ? null : () => _showPlayerDetail(player),
+    );
+  }
+
+  Widget _irBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
       ),
-      onTap: () => _showPlayerDetail(player),
+      child: const Text('IR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red)),
+    );
+  }
+
+  void _showActivateDialog(_Player irPlayer) {
+    final candidates = _players!
+        .where((p) => p.position == irPlayer.position && !p.onIr)
+        .toList();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _ActivateSheet(
+        irPlayer: irPlayer,
+        candidates: candidates,
+        leagueId: widget.leagueId,
+        teamId: widget.teamId,
+        onActivated: () { Navigator.pop(context); _load(); },
+      ),
     );
   }
 
@@ -324,7 +368,14 @@ class _PlayerDetailSheetState extends State<_PlayerDetailSheet> {
                         '${player.position}  ·  Age ${player.age}',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                      if (player.isInjured)
+                      if (player.isReturnReady)
+                        const Text('Return ready — activate from roster', style: TextStyle(color: Colors.orange))
+                      else if (player.onIr)
+                        Text(
+                          'IR · OUT ${player.injuryGamesRemaining} game${player.injuryGamesRemaining == 1 ? '' : 's'}',
+                          style: const TextStyle(color: Colors.red),
+                        )
+                      else if (player.isInjured)
                         Text(
                           'OUT ${player.injuryGamesRemaining} game${player.injuryGamesRemaining == 1 ? '' : 's'}',
                           style: const TextStyle(color: Colors.red),
@@ -454,6 +505,128 @@ class _PlayerDetailSheetState extends State<_PlayerDetailSheet> {
           valueColor: AlwaysStoppedAnimation(color),
         ),
       ),
+    );
+  }
+}
+
+// ── Activate sheet ────────────────────────────────────────────────────────────
+
+class _ActivateSheet extends StatefulWidget {
+  final _Player irPlayer;
+  final List<_Player> candidates;
+  final String leagueId;
+  final String teamId;
+  final VoidCallback onActivated;
+
+  const _ActivateSheet({
+    required this.irPlayer,
+    required this.candidates,
+    required this.leagueId,
+    required this.teamId,
+    required this.onActivated,
+  });
+
+  @override
+  State<_ActivateSheet> createState() => _ActivateSheetState();
+}
+
+class _ActivateSheetState extends State<_ActivateSheet> {
+  _Player? _selected;
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _confirm() async {
+    if (_selected == null) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final auth = context.read<AuthProvider>();
+      final res = await http.post(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.teamId}/activate'),
+        headers: {...auth.authHeaders, 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'drop_player_id':     _selected!.id,
+          'activate_player_id': widget.irPlayer.id,
+        }),
+      );
+      if (res.statusCode == 204) {
+        widget.onActivated();
+      } else {
+        final msg = jsonDecode(res.body)['detail'] ?? 'Activation failed';
+        setState(() { _error = msg; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.35,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (context, scroll) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Activate ${widget.irPlayer.name}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Text(
+                'Drop a ${widget.irPlayer.position} from active roster:',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              if (widget.candidates.isEmpty)
+                const Text('No active players at this position to drop.')
+              else
+                Expanded(
+                  child: ListView(
+                    controller: scroll,
+                    children: widget.candidates.map((p) {
+                      final selected = _selected?.id == p.id;
+                      return ListTile(
+                        dense: true,
+                        title: Text(p.name),
+                        subtitle: Text('Age ${p.age}'),
+                        trailing: Text(
+                          p.composite.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: selected
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
+                          ),
+                        ),
+                        selected: selected,
+                        onTap: () => setState(() => _selected = p),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: (_selected != null && !_loading) ? _confirm : null,
+                  child: _loading
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Drop & Activate'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
