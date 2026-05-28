@@ -139,6 +139,16 @@ class PlayerRosterItem(BaseModel):
     composite:              float
     named_stats:            dict[str, int]
     injury_games_remaining: int
+    on_ir:                  bool
+
+
+class SignFARequest(BaseModel):
+    player_id: uuid.UUID
+
+
+class ActivateRequest(BaseModel):
+    drop_player_id:     uuid.UUID
+    activate_player_id: uuid.UUID
 
 
 class LeagueAvailableItem(BaseModel):

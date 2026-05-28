@@ -10,10 +10,11 @@ from sim.player_gen import POSITION_STATS, assign_label
 from sqlalchemy import func
 from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
-    AvailableLeaguesResponse, GameDetailResponse, GameMatchupResponse, GameResponse,
-    GroupComposite, LeagueAvailableItem, LeagueCreateRequest, LeagueDetailResponse,
-    LeagueResponse, PlayerRosterItem, PlayerScoutItem, PlayerStatLine, PlayerStatsResponse,
-    StandingRow, StandingsResponse, TeamMatchupSide, TeamPickerItem, TeamResponse,
+    ActivateRequest, AvailableLeaguesResponse, GameDetailResponse, GameMatchupResponse,
+    GameResponse, GroupComposite, LeagueAvailableItem, LeagueCreateRequest,
+    LeagueDetailResponse, LeagueResponse, PlayerRosterItem, PlayerScoutItem, PlayerStatLine,
+    PlayerStatsResponse, SignFARequest, StandingRow, StandingsResponse, TeamMatchupSide,
+    TeamPickerItem, TeamResponse,
 )
 from ..services.league_service import create_league
 
@@ -142,6 +143,7 @@ async def get_roster(league_id: uuid.UUID, team_id: uuid.UUID, db: AsyncSession 
             composite=p.composite,
             named_stats={name: val for name, val in zip(stat_names, p.stats)},
             injury_games_remaining=p.injury_games_remaining,
+            on_ir=p.on_ir,
         ))
     return items
 
@@ -164,6 +166,75 @@ async def get_free_agents(league_id: uuid.UUID, db: AsyncSession = Depends(get_d
         .order_by(Player.position, Player.composite.desc())
     )
     return _to_scout_items(result.scalars().all())
+
+
+_POSITION_MAX_ACTIVE = {
+    'QB': 2, 'WR': 4, 'TE': 2, 'RB': 2, 'OL': 6,
+    'DT': 3, 'DE': 3, 'LB': 4, 'CB': 3, 'S': 3,
+    'K': 1, 'P': 1,
+}
+
+
+@router.post('/{league_id}/teams/{team_id}/sign-fa', status_code=204)
+async def sign_free_agent(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    body:      SignFARequest,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id or team.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='Not your team')
+
+    player = await db.get(Player, body.player_id)
+    if not player or player.league_id != league_id or player.team_id is not None:
+        raise HTTPException(status_code=404, detail='Player not available')
+
+    result = await db.execute(
+        select(func.count()).where(
+            Player.team_id  == team_id,
+            Player.on_ir    == False,  # noqa: E712
+            Player.position == player.position,
+        )
+    )
+    active_at_pos = result.scalar()
+    if active_at_pos >= _POSITION_MAX_ACTIVE.get(player.position, 0):
+        raise HTTPException(status_code=409, detail=f'No open {player.position} slot on active roster')
+
+    player.team_id = team_id
+    player.on_ir   = False
+    await db.commit()
+
+
+@router.post('/{league_id}/teams/{team_id}/activate', status_code=204)
+async def activate_ir_player(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    body:      ActivateRequest,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id or team.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='Not your team')
+
+    drop     = await db.get(Player, body.drop_player_id)
+    activate = await db.get(Player, body.activate_player_id)
+
+    if not drop or drop.team_id != team_id or drop.on_ir:
+        raise HTTPException(status_code=400, detail='Drop player must be active on your roster')
+    if not activate or activate.team_id != team_id or not activate.on_ir:
+        raise HTTPException(status_code=400, detail='Activate player must be on IR on your roster')
+    if activate.injury_games_remaining > 0:
+        raise HTTPException(status_code=400, detail='Player not yet recovered')
+    if drop.position != activate.position:
+        raise HTTPException(status_code=400, detail=f'Must drop a {activate.position} to activate a {activate.position}')
+
+    drop.team_id    = None
+    drop.on_ir      = False
+    activate.on_ir  = False
+    await db.commit()
 
 
 def _to_scout_items(players) -> list[PlayerScoutItem]:

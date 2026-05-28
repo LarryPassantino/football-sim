@@ -30,7 +30,9 @@ async def load_team_as_sim_dict(db: AsyncSession, team) -> dict:
     Players are sorted by composite DESC within each position (starter-first ordering
     that the sim engine relies on).
     """
-    result  = await db.execute(select(Player).where(Player.team_id == team.id))
+    result  = await db.execute(
+        select(Player).where(Player.team_id == team.id, Player.on_ir == False)  # noqa: E712
+    )
     players = result.scalars().all()
 
     roster = defaultdict(list)
@@ -63,10 +65,14 @@ async def write_back_injuries(db: AsyncSession, sim_team: dict) -> None:
         for p in players:
             if '_db_id' not in p:
                 continue
+            igr    = p['injury_games_remaining']
+            values = {'injury_games_remaining': igr}
+            if igr > 0:
+                values['on_ir'] = True
             await db.execute(
                 update(Player)
                 .where(Player.id == p['_db_id'])
-                .values(injury_games_remaining=p['injury_games_remaining'])
+                .values(**values)
             )
 
 
@@ -75,7 +81,7 @@ async def clear_all_injuries(db: AsyncSession, league_id) -> None:
     await db.execute(
         update(Player)
         .where(Player.league_id == league_id)
-        .values(injury_games_remaining=0)
+        .values(injury_games_remaining=0, on_ir=False)
     )
 
 

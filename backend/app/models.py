@@ -79,6 +79,7 @@ class Player(Base):
     composite:               Mapped[float]          = mapped_column(Float, nullable=False)
     potential:               Mapped[float]          = mapped_column(Float, nullable=False)
     injury_games_remaining:  Mapped[int]            = mapped_column(Integer, default=0)
+    on_ir:                   Mapped[bool]           = mapped_column(Boolean, default=False, server_default='false')
     career_stats:            Mapped[dict]           = mapped_column(JSONB, default=dict, server_default='{}')
 
 
