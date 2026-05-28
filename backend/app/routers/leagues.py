@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,10 +10,10 @@ from sim.player_gen import POSITION_STATS, assign_label
 from sqlalchemy import func
 from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
-    AvailableLeaguesResponse, GameDetailResponse, GameResponse, LeagueAvailableItem,
-    LeagueCreateRequest, LeagueDetailResponse, LeagueResponse, PlayerRosterItem,
-    PlayerScoutItem, PlayerStatLine, PlayerStatsResponse, StandingRow, StandingsResponse,
-    TeamPickerItem, TeamResponse,
+    AvailableLeaguesResponse, GameDetailResponse, GameMatchupResponse, GameResponse,
+    GroupComposite, LeagueAvailableItem, LeagueCreateRequest, LeagueDetailResponse,
+    LeagueResponse, PlayerRosterItem, PlayerScoutItem, PlayerStatLine, PlayerStatsResponse,
+    StandingRow, StandingsResponse, TeamMatchupSide, TeamPickerItem, TeamResponse,
 )
 from ..services.league_service import create_league
 
@@ -270,6 +270,118 @@ async def get_game_detail(
         played_at=game.played_at,
         home_stats=home_stats,
         away_stats=away_stats,
+    )
+
+
+_POSITION_STARTERS = {
+    'QB': 1, 'WR': 3, 'TE': 1, 'RB': 1, 'OL': 5,
+    'DT': 2, 'DE': 2, 'LB': 3, 'CB': 2, 'S': 2,
+    'K': 1, 'P': 1,
+}
+
+
+def _compute_team_groups(players: list) -> dict[str, GroupComposite]:
+    by_pos: dict[str, list[float]] = {}
+    for p in players:
+        by_pos.setdefault(p.position, []).append(p.composite)
+    for pos in by_pos:
+        by_pos[pos].sort(reverse=True)
+
+    groups: dict[str, GroupComposite] = {}
+    for pos, starter_count in _POSITION_STARTERS.items():
+        composites = by_pos.get(pos, [])
+        if not composites:
+            continue
+        starters = composites[:starter_count]
+        backup = composites[starter_count:starter_count + 1]
+        starter_avg = sum(starters) / len(starters)
+        group_comp = round(0.80 * starter_avg + 0.20 * backup[0], 1) if backup else round(starter_avg, 1)
+        label = assign_label(round(group_comp)) or 'Average'
+        groups[pos] = GroupComposite(composite=group_comp, label=label)
+    return groups
+
+
+@router.get('/{league_id}/games/{game_id}/matchup', response_model=GameMatchupResponse)
+async def get_game_matchup(
+    league_id: uuid.UUID,
+    game_id:   uuid.UUID,
+    db:        AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Game)
+        .where(Game.id == game_id)
+        .options(selectinload(Game.home_team), selectinload(Game.away_team))
+    )
+    game = result.scalar_one_or_none()
+    if not game or game.home_team.league_id != league_id:
+        raise HTTPException(status_code=404, detail='Game not found')
+
+    home_id = game.home_team_id
+    away_id = game.away_team_id
+
+    result = await db.execute(
+        select(Player).where(Player.team_id.in_([home_id, away_id]))
+    )
+    all_players = result.scalars().all()
+    home_players = [p for p in all_players if p.team_id == home_id]
+    away_players = [p for p in all_players if p.team_id == away_id]
+
+    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    season = result.scalar_one_or_none()
+
+    records: dict[uuid.UUID, dict] = {
+        home_id: {'wins': 0, 'losses': 0, 'ties': 0},
+        away_id: {'wins': 0, 'losses': 0, 'ties': 0},
+    }
+    if season:
+        result = await db.execute(
+            select(Game).where(
+                Game.season_id == season.id,
+                Game.status == GameStatus.complete,
+                Game.is_playoff == False,  # noqa: E712
+                or_(
+                    Game.home_team_id.in_([home_id, away_id]),
+                    Game.away_team_id.in_([home_id, away_id]),
+                ),
+            )
+        )
+        for g in result.scalars().all():
+            if g.home_score > g.away_score:
+                if g.home_team_id in records:
+                    records[g.home_team_id]['wins'] += 1
+                if g.away_team_id in records:
+                    records[g.away_team_id]['losses'] += 1
+            elif g.away_score > g.home_score:
+                if g.away_team_id in records:
+                    records[g.away_team_id]['wins'] += 1
+                if g.home_team_id in records:
+                    records[g.home_team_id]['losses'] += 1
+            else:
+                if g.home_team_id in records:
+                    records[g.home_team_id]['ties'] += 1
+                if g.away_team_id in records:
+                    records[g.away_team_id]['ties'] += 1
+
+    return GameMatchupResponse(
+        game_id=game.id,
+        week=game.week,
+        is_playoff=game.is_playoff,
+        home_team=TeamMatchupSide(
+            team_id=home_id,
+            name=game.home_team.name,
+            wins=records[home_id]['wins'],
+            losses=records[home_id]['losses'],
+            ties=records[home_id]['ties'],
+            groups=_compute_team_groups(home_players),
+        ),
+        away_team=TeamMatchupSide(
+            team_id=away_id,
+            name=game.away_team.name,
+            wins=records[away_id]['wins'],
+            losses=records[away_id]['losses'],
+            ties=records[away_id]['ties'],
+            groups=_compute_team_groups(away_players),
+        ),
     )
 
 

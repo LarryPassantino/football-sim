@@ -183,6 +183,28 @@ class PlayerStatsResponse(BaseModel):
     career: dict[str, int]
 
 
+class GroupComposite(BaseModel):
+    composite: float
+    label:     str
+
+
+class TeamMatchupSide(BaseModel):
+    team_id: uuid.UUID
+    name:    str
+    wins:    int
+    losses:  int
+    ties:    int
+    groups:  dict[str, GroupComposite]
+
+
+class GameMatchupResponse(BaseModel):
+    game_id:    uuid.UUID
+    week:       int
+    is_playoff: bool
+    home_team:  TeamMatchupSide
+    away_team:  TeamMatchupSide
+
+
 class CoachTeamItem(BaseModel):
     team_id:    uuid.UUID
     team_name:  str
