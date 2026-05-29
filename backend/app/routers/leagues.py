@@ -11,11 +11,12 @@ from sim.player_gen import POSITION_STATS, assign_label
 from sqlalchemy import func
 from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
 from ..schemas import (
-    ActivateRequest, AvailableLeaguesResponse, GameDetailResponse, GameMatchupResponse,
-    GameResponse, GroupComposite, LeagueAvailableItem, LeagueCreateRequest,
-    LeagueDetailResponse, LeagueResponse, PlayerRosterItem, PlayerScoutItem, PlayerStatLine,
-    PlayerStatsResponse, ReleaseRequest, ReleaseResponse, SignFARequest, StandingRow,
-    StandingsResponse, TeamMatchupSide, TeamPickerItem, TeamResponse, TradeRequest, TradeResponse,
+    ActivateRequest, AvailableLeaguesResponse, DefenseLeader, GameDetailResponse,
+    GameMatchupResponse, GameResponse, GroupComposite, LeagueAvailableItem, LeagueCreateRequest,
+    LeagueDetailResponse, LeagueLeadersResponse, LeagueResponse, PassingLeader, PlayerRosterItem,
+    PlayerScoutItem, PlayerStatLine, PlayerStatsResponse, ReceivingLeader, ReleaseRequest,
+    ReleaseResponse, RushingLeader, SignFARequest, StandingRow, StandingsResponse, TeamMatchupSide,
+    TeamPickerItem, TeamResponse, TradeRequest, TradeResponse,
 )
 from ..services.league_service import create_league
 
@@ -639,4 +640,96 @@ async def get_player_stats(
     return PlayerStatsResponse(
         ytd=ytd,
         career={f: int(player.career_stats.get(f, 0)) for f in _STAT_FIELDS},
+    )
+
+
+@router.get('/{league_id}/leaders', response_model=LeagueLeadersResponse)
+async def get_league_leaders(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    season = result.scalar_one_or_none()
+    if not season:
+        raise HTTPException(status_code=404, detail='No season found')
+
+    agg = await db.execute(
+        select(
+            Player.id.label('player_id'),
+            Player.name.label('player_name'),
+            Player.position,
+            Team.name.label('team_name'),
+            func.sum(PlayerGameStats.pass_yards).label('pass_yards'),
+            func.sum(PlayerGameStats.pass_tds).label('pass_tds'),
+            func.sum(PlayerGameStats.pass_completions).label('pass_completions'),
+            func.sum(PlayerGameStats.pass_attempts).label('pass_attempts'),
+            func.sum(PlayerGameStats.interceptions_thrown).label('interceptions_thrown'),
+            func.sum(PlayerGameStats.rush_yards).label('rush_yards'),
+            func.sum(PlayerGameStats.rush_tds).label('rush_tds'),
+            func.sum(PlayerGameStats.rush_attempts).label('rush_attempts'),
+            func.sum(PlayerGameStats.receiving_yards).label('receiving_yards'),
+            func.sum(PlayerGameStats.receiving_tds).label('receiving_tds'),
+            func.sum(PlayerGameStats.receptions).label('receptions'),
+            func.sum(PlayerGameStats.tackles).label('tackles'),
+            func.sum(PlayerGameStats.sacks).label('sacks'),
+            func.sum(PlayerGameStats.interceptions).label('interceptions'),
+            func.sum(PlayerGameStats.forced_fumbles).label('forced_fumbles'),
+            func.sum(PlayerGameStats.fumble_recoveries).label('fumble_recoveries'),
+        )
+        .select_from(PlayerGameStats)
+        .join(Game, PlayerGameStats.game_id == Game.id)
+        .join(Player, PlayerGameStats.player_id == Player.id)
+        .outerjoin(Team, Player.team_id == Team.id)
+        .where(Game.season_id == season.id)
+        .group_by(Player.id, Player.name, Player.position, Team.name)
+    )
+    rows = agg.all()
+
+    passing, rushing, receiving, defense = [], [], [], []
+    for row in rows:
+        base = dict(
+            player_id=row.player_id,
+            player_name=row.player_name,
+            team_name=row.team_name or 'Free Agent',
+            position=row.position,
+        )
+        if (row.pass_yards or 0) > 0:
+            passing.append(PassingLeader(**base,
+                pass_yards=row.pass_yards or 0,
+                pass_tds=row.pass_tds or 0,
+                pass_completions=row.pass_completions or 0,
+                pass_attempts=row.pass_attempts or 0,
+                interceptions_thrown=row.interceptions_thrown or 0,
+            ))
+        if (row.rush_yards or 0) > 0:
+            rushing.append(RushingLeader(**base,
+                rush_yards=row.rush_yards or 0,
+                rush_tds=row.rush_tds or 0,
+                rush_attempts=row.rush_attempts or 0,
+            ))
+        if (row.receiving_yards or 0) > 0:
+            receiving.append(ReceivingLeader(**base,
+                receiving_yards=row.receiving_yards or 0,
+                receiving_tds=row.receiving_tds or 0,
+                receptions=row.receptions or 0,
+            ))
+        def_total = sum(getattr(row, f) or 0 for f in (
+            'tackles', 'sacks', 'interceptions', 'forced_fumbles', 'fumble_recoveries'
+        ))
+        if def_total > 0:
+            defense.append(DefenseLeader(**base,
+                tackles=row.tackles or 0,
+                sacks=row.sacks or 0,
+                interceptions=row.interceptions or 0,
+                forced_fumbles=row.forced_fumbles or 0,
+                fumble_recoveries=row.fumble_recoveries or 0,
+            ))
+
+    passing.sort(key=lambda x: x.pass_yards, reverse=True)
+    rushing.sort(key=lambda x: x.rush_yards, reverse=True)
+    receiving.sort(key=lambda x: x.receiving_yards, reverse=True)
+    defense.sort(key=lambda x: x.tackles, reverse=True)
+
+    return LeagueLeadersResponse(
+        passing=passing[:10],
+        rushing=rushing[:10],
+        receiving=receiving[:10],
+        defense=defense[:10],
     )

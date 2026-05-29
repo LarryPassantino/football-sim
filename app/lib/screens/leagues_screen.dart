@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
 import 'game_detail_screen.dart';
+import 'league_leaders_screen.dart';
 import 'matchup_screen.dart';
 import 'roster_screen.dart';
 import 'schedule_screen.dart';
@@ -247,6 +248,17 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                 leagueId: leagueId,
                 myTeamId: auth.teamId!,
               ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.leaderboard),
+          label: const Text('League Leaders'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LeagueLeadersScreen(leagueId: leagueId),
             ),
           ),
         ),

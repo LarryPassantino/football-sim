@@ -233,6 +233,57 @@ class GameMatchupResponse(BaseModel):
     away_team:  TeamMatchupSide
 
 
+class PassingLeader(BaseModel):
+    player_id:            uuid.UUID
+    player_name:          str
+    team_name:            str
+    position:             str
+    pass_yards:           int
+    pass_tds:             int
+    pass_completions:     int
+    pass_attempts:        int
+    interceptions_thrown: int
+
+
+class RushingLeader(BaseModel):
+    player_id:     uuid.UUID
+    player_name:   str
+    team_name:     str
+    position:      str
+    rush_yards:    int
+    rush_tds:      int
+    rush_attempts: int
+
+
+class ReceivingLeader(BaseModel):
+    player_id:       uuid.UUID
+    player_name:     str
+    team_name:       str
+    position:        str
+    receiving_yards: int
+    receiving_tds:   int
+    receptions:      int
+
+
+class DefenseLeader(BaseModel):
+    player_id:         uuid.UUID
+    player_name:       str
+    team_name:         str
+    position:          str
+    tackles:           int
+    sacks:             int
+    interceptions:     int
+    forced_fumbles:    int
+    fumble_recoveries: int
+
+
+class LeagueLeadersResponse(BaseModel):
+    passing:   list[PassingLeader]
+    rushing:   list[RushingLeader]
+    receiving: list[ReceivingLeader]
+    defense:   list[DefenseLeader]
+
+
 class CoachTeamItem(BaseModel):
     team_id:    uuid.UUID
     team_name:  str
