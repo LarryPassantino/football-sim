@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict
 from functools import cmp_to_key
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -207,6 +207,92 @@ def _seed_conference(standings: dict, conference: str) -> list[dict]:
 
 
 # ============================================================
+# CPU ROSTER MANAGEMENT
+# ============================================================
+
+_POSITION_MAX_ACTIVE = {
+    'QB': 2, 'WR': 4, 'TE': 2, 'RB': 2, 'OL': 6,
+    'DT': 3, 'DE': 3, 'LB': 4, 'CB': 3, 'S': 3,
+    'K': 1, 'P': 1,
+}
+
+
+async def run_cpu_roster_moves(db: AsyncSession, season: Season) -> None:
+    """
+    After each game tick, CPU teams:
+      1. Activate any fully recovered IR players (drop weakest active at same position).
+      2. Sign the best available FA for any position slot still under the active max.
+    Human teams are skipped — they manage their own rosters.
+    """
+    league_id = season.league_id
+
+    result = await db.execute(
+        select(Team).where(Team.league_id == league_id, Team.is_cpu == True)  # noqa: E712
+    )
+    cpu_teams = result.scalars().all()
+
+    for team in cpu_teams:
+        # ── Step 1: activate recovered IR players ────────────────────────────
+        result = await db.execute(
+            select(Player).where(
+                Player.team_id               == team.id,
+                Player.on_ir                 == True,   # noqa: E712
+                Player.injury_games_remaining == 0,
+            )
+        )
+        recovered = result.scalars().all()
+
+        for ir_player in recovered:
+            # Drop the weakest active player at the same position
+            result = await db.execute(
+                select(Player)
+                .where(
+                    Player.team_id  == team.id,
+                    Player.on_ir    == False,  # noqa: E712
+                    Player.position == ir_player.position,
+                )
+                .order_by(Player.composite.asc())
+                .limit(1)
+            )
+            drop = result.scalar_one_or_none()
+            if drop:
+                drop.team_id = None
+                drop.on_ir   = False
+            ir_player.on_ir = False
+
+        # Flush so dropped players appear as free agents in the next query
+        await db.flush()
+
+        # ── Step 2: fill open active slots with best available FA ─────────────
+        for pos, max_count in _POSITION_MAX_ACTIVE.items():
+            result = await db.execute(
+                select(func.count()).where(
+                    Player.team_id  == team.id,
+                    Player.on_ir    == False,  # noqa: E712
+                    Player.position == pos,
+                )
+            )
+            active_count = result.scalar()
+            if active_count >= max_count:
+                continue
+
+            result = await db.execute(
+                select(Player)
+                .where(
+                    Player.league_id == league_id,
+                    Player.team_id.is_(None),
+                    Player.position  == pos,
+                )
+                .order_by(Player.composite.desc())
+                .limit(1)
+            )
+            fa = result.scalar_one_or_none()
+            if fa:
+                fa.team_id = team.id
+                fa.on_ir   = False
+
+
+# ============================================================
 # WEEK ADVANCEMENT
 # ============================================================
 
@@ -239,6 +325,8 @@ async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
         if game.status == GameStatus.complete:
             continue
         await play_game(db, game, game.home_team, game.away_team, games_remaining)
+
+    await run_cpu_roster_moves(db, season)
 
     season.current_week += 1
 
@@ -285,6 +373,8 @@ async def _advance_playoff_week(db: AsyncSession, season: Season) -> dict:
         if game.status == GameStatus.complete:
             continue
         await play_game(db, game, game.home_team, game.away_team, gr)
+
+    await run_cpu_roster_moves(db, season)
 
     if season.current_week == PLAYOFF_DIVISIONAL:
         # Group by conference, create one conf championship game per conference

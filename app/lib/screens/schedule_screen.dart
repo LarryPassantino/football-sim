@@ -156,7 +156,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           ),
         ),
         child: Text(
-          '${game.homeScore}–${game.awayScore}',
+          '${game.awayScore}–${game.homeScore}',
           style: TextStyle(
             fontWeight: isMyGame ? FontWeight.bold : FontWeight.normal,
             color: isMyGame ? (won ? Colors.green : lost ? Colors.red : null) : null,
