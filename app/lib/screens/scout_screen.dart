@@ -235,6 +235,7 @@ class _ScoutScreenState extends State<ScoutScreen> {
         leagueId: widget.leagueId,
         myTeamId: widget.myTeamId,
         onSigned: () { Navigator.pop(context); _load(); },
+        onTraded: () { Navigator.pop(context); _load(); },
       ),
     );
   }
@@ -246,6 +247,7 @@ class _ScoutPlayerSheet extends StatefulWidget {
   final String leagueId;
   final String myTeamId;
   final VoidCallback onSigned;
+  final VoidCallback onTraded;
 
   const _ScoutPlayerSheet({
     required this.player,
@@ -253,6 +255,7 @@ class _ScoutPlayerSheet extends StatefulWidget {
     required this.leagueId,
     required this.myTeamId,
     required this.onSigned,
+    required this.onTraded,
   });
 
   @override
@@ -261,7 +264,9 @@ class _ScoutPlayerSheet extends StatefulWidget {
 
 class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
   bool _signing = false;
+  bool _trading = false;
   String? _error;
+  String? _tradeError;
 
   Future<void> _signPlayer() async {
     final confirmed = await showDialog<bool>(
@@ -295,6 +300,80 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
       }
     } catch (e) {
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _signing = false; });
+    }
+  }
+
+  Future<void> _requestTrade() async {
+    setState(() { _trading = true; _tradeError = null; });
+    List<Map<String, dynamic>> myRoster;
+    try {
+      final auth = context.read<AuthProvider>();
+      final res = await http.get(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.myTeamId}/roster'),
+        headers: auth.authHeaders,
+      );
+      if (res.statusCode != 200) throw Exception('Failed to load your roster');
+      myRoster = (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      setState(() { _tradeError = e.toString().replaceFirst('Exception: ', ''); _trading = false; });
+      return;
+    }
+    setState(() { _trading = false; });
+
+    final active = myRoster.where((p) => !(p['on_ir'] as bool? ?? false)).toList();
+    if (!mounted) return;
+
+    final picked = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _TradePickerDialog(players: active),
+    );
+    if (picked == null || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirm Trade'),
+        content: Text('Offer ${picked['name']} for ${widget.player.name}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Offer')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() { _trading = true; });
+    try {
+      final auth = context.read<AuthProvider>();
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      final res = await http.post(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.myTeamId}/trade'),
+        headers: {...auth.authHeaders, 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'my_player_id':    picked['id'],
+          'their_player_id': widget.player.id,
+        }),
+      );
+      if (!mounted) return;
+      if (res.statusCode == 200) {
+        final data     = jsonDecode(res.body) as Map<String, dynamic>;
+        final accepted = data['accepted'] as bool;
+        final reason   = data['reason'] as String;
+        if (accepted) {
+          widget.onTraded();
+          scaffoldMessenger.showSnackBar(SnackBar(
+            content: Text('Trade accepted! ${picked['name']} ↔ ${widget.player.name}'),
+            backgroundColor: Colors.green,
+          ));
+        } else {
+          setState(() { _tradeError = reason; _trading = false; });
+        }
+      } else {
+        final msg = jsonDecode(res.body)['detail'] ?? 'Trade request failed';
+        setState(() { _tradeError = msg; _trading = false; });
+      }
+    } catch (e) {
+      setState(() { _tradeError = e.toString().replaceFirst('Exception: ', ''); _trading = false; });
     }
   }
 
@@ -350,6 +429,11 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(_error!, style: const TextStyle(color: Colors.red)),
               ),
+            if (_tradeError != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(_tradeError!, style: const TextStyle(color: Colors.red)),
+              ),
             if (widget.isFreeAgents)
               FilledButton(
                 onPressed: _signing ? null : _signPlayer,
@@ -359,8 +443,10 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
               )
             else
               OutlinedButton(
-                onPressed: null,
-                child: const Text('Request Trade'),
+                onPressed: _trading ? null : _requestTrade,
+                child: _trading
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Request Trade'),
               ),
           ],
         );
@@ -394,6 +480,42 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
         label,
         style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
       ),
+    );
+  }
+}
+
+class _TradePickerDialog extends StatelessWidget {
+  final List<Map<String, dynamic>> players;
+  const _TradePickerDialog({required this.players});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Select your offer'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: players.length,
+          itemBuilder: (_, i) {
+            final p         = players[i];
+            final composite = (p['composite'] as num).toDouble();
+            return ListTile(
+              dense: true,
+              title: Text(p['name'] as String),
+              subtitle: Text('${p['position']}  ·  Age ${p['age']}'),
+              trailing: Text(
+                composite.toStringAsFixed(1),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () => Navigator.pop(context, p),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      ],
     );
   }
 }

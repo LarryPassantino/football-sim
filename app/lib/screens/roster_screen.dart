@@ -145,27 +145,109 @@ class _RosterScreenState extends State<RosterScreen> {
     else if (player.onIr)           subtitle += '  ·  IR · OUT ${player.injuryGamesRemaining}g';
     else if (player.isInjured)      subtitle += '  ·  OUT ${player.injuryGamesRemaining}g';
 
+    final Widget trailing;
+    if (player.isReturnReady) {
+      trailing = FilledButton.tonal(
+        onPressed: () => _showActivateDialog(player),
+        child: const Text('Activate'),
+      );
+    } else if (player.onIr) {
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [_irBadge(), const SizedBox(width: 8), _compositeChip(player.composite)],
+      );
+    } else {
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (player.isInjured)
+            const Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: Icon(Icons.local_hospital, size: 16, color: Colors.red),
+            ),
+          _compositeChip(player.composite),
+          _releaseMenuButton(player),
+        ],
+      );
+    }
+
     return ListTile(
       dense: true,
       title: Text(player.name),
       subtitle: Text(subtitle),
-      trailing: player.isReturnReady
-          ? FilledButton.tonal(
-              onPressed: () => _showActivateDialog(player),
-              child: const Text('Activate'),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (player.onIr)
-                  _irBadge()
-                else if (player.isInjured)
-                  const Icon(Icons.local_hospital, size: 16, color: Colors.red),
-                const SizedBox(width: 8),
-                _compositeChip(player.composite),
-              ],
-            ),
+      trailing: trailing,
       onTap: player.isReturnReady ? null : () => _showPlayerDetail(player),
+    );
+  }
+
+  Widget _releaseMenuButton(_Player player) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert, size: 18),
+      onSelected: (val) {
+        if (val == 'release') _confirmRelease(player);
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'release', child: Text('Release')),
+      ],
+    );
+  }
+
+  Future<void> _confirmRelease(_Player player) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Release Player'),
+        content: Text('Release ${player.name} to free agency?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Release'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final auth = context.read<AuthProvider>();
+      final res = await http.post(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.teamId}/release'),
+        headers: {...auth.authHeaders, 'Content-Type': 'application/json'},
+        body: jsonEncode({'player_id': player.id}),
+      );
+      if (!mounted) return;
+      if (res.statusCode != 200) {
+        final msg = jsonDecode(res.body)['detail'] ?? 'Release failed';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        return;
+      }
+      final data   = jsonDecode(res.body) as Map<String, dynamic>;
+      final thin   = (data['thin_positions'] as List).cast<String>();
+      _load();
+      if (thin.isNotEmpty) _showThinWarning(thin);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    }
+  }
+
+  void _showThinWarning(List<String> thin) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Roster Short'),
+        content: Text(
+          'You are below the active roster limit at: ${thin.join(', ')}.\n\nConsider signing a free agent.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+        ],
+      ),
     );
   }
 

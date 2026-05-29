@@ -1,3 +1,4 @@
+import random
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,8 +14,8 @@ from ..schemas import (
     ActivateRequest, AvailableLeaguesResponse, GameDetailResponse, GameMatchupResponse,
     GameResponse, GroupComposite, LeagueAvailableItem, LeagueCreateRequest,
     LeagueDetailResponse, LeagueResponse, PlayerRosterItem, PlayerScoutItem, PlayerStatLine,
-    PlayerStatsResponse, SignFARequest, StandingRow, StandingsResponse, TeamMatchupSide,
-    TeamPickerItem, TeamResponse,
+    PlayerStatsResponse, ReleaseRequest, ReleaseResponse, SignFARequest, StandingRow,
+    StandingsResponse, TeamMatchupSide, TeamPickerItem, TeamResponse, TradeRequest, TradeResponse,
 )
 from ..services.league_service import create_league
 
@@ -235,6 +236,87 @@ async def activate_ir_player(
     drop.on_ir      = False
     activate.on_ir  = False
     await db.commit()
+
+
+@router.post('/{league_id}/teams/{team_id}/release', response_model=ReleaseResponse)
+async def release_player(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    body:      ReleaseRequest,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id or team.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='Not your team')
+
+    player = await db.get(Player, body.player_id)
+    if not player or player.team_id != team_id:
+        raise HTTPException(status_code=400, detail='Player not on your team')
+
+    player.team_id = None
+    player.on_ir   = False
+    await db.flush()
+
+    thin = []
+    for pos, max_count in _POSITION_MAX_ACTIVE.items():
+        result = await db.execute(
+            select(func.count()).where(
+                Player.team_id  == team_id,
+                Player.on_ir    == False,  # noqa: E712
+                Player.position == pos,
+            )
+        )
+        if result.scalar() < max_count:
+            thin.append(pos)
+
+    await db.commit()
+    return ReleaseResponse(thin_positions=thin)
+
+
+_TRADE_TOLERANCE   = 5
+_TRADE_REJECT_RATE = 0.20
+
+
+@router.post('/{league_id}/teams/{team_id}/trade', response_model=TradeResponse)
+async def request_trade(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    body:      TradeRequest,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id or team.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='Not your team')
+
+    my_player = await db.get(Player, body.my_player_id)
+    if not my_player or my_player.team_id != team_id:
+        raise HTTPException(status_code=400, detail='Player not on your team')
+    if my_player.on_ir:
+        raise HTTPException(status_code=400, detail='Cannot trade a player on IR')
+
+    their_player = await db.get(Player, body.their_player_id)
+    if not their_player or their_player.league_id != league_id or their_player.team_id is None:
+        raise HTTPException(status_code=400, detail='Player not found')
+    if their_player.on_ir:
+        raise HTTPException(status_code=400, detail='That player is on IR')
+
+    cpu_team = await db.get(Team, their_player.team_id)
+    if not cpu_team or not cpu_team.is_cpu:
+        raise HTTPException(status_code=400, detail='Can only trade with CPU teams')
+
+    delta = my_player.composite - their_player.composite
+    if delta < -_TRADE_TOLERANCE:
+        return TradeResponse(accepted=False, reason='Not enough value in your offer')
+
+    if random.random() < _TRADE_REJECT_RATE:
+        return TradeResponse(accepted=False, reason='Not interested at this time')
+
+    my_player.team_id    = their_player.team_id
+    their_player.team_id = team_id
+    await db.commit()
+    return TradeResponse(accepted=True, reason='Trade accepted')
 
 
 def _to_scout_items(players) -> list[PlayerScoutItem]:

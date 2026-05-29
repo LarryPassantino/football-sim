@@ -151,6 +151,24 @@ class ActivateRequest(BaseModel):
     activate_player_id: uuid.UUID
 
 
+class ReleaseRequest(BaseModel):
+    player_id: uuid.UUID
+
+
+class ReleaseResponse(BaseModel):
+    thin_positions: list[str]
+
+
+class TradeRequest(BaseModel):
+    my_player_id:    uuid.UUID
+    their_player_id: uuid.UUID
+
+
+class TradeResponse(BaseModel):
+    accepted: bool
+    reason:   str
+
+
 class LeagueAvailableItem(BaseModel):
     id:                uuid.UUID
     name:              str
