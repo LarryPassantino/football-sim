@@ -202,6 +202,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         title: Text(auth.teamName ?? 'My Team'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(icon: const Icon(Icons.edit), onPressed: () => _showRenameDialog(auth)),
           IconButton(icon: const Icon(Icons.logout), onPressed: () => auth.logout()),
         ],
       ),
@@ -211,6 +212,50 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
               ? Center(child: Text(_error!))
               : _buildHome(auth),
     );
+  }
+
+  Future<void> _showRenameDialog(AuthProvider auth) async {
+    final controller = TextEditingController(text: auth.teamName);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Rename Team'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Team name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName == null || newName.isEmpty || newName == auth.teamName || !mounted) return;
+
+    try {
+      final res = await http.patch(
+        Uri.parse('$kBaseUrl/leagues/${auth.leagueId}/teams/${auth.teamId}'),
+        headers: auth.authHeaders,
+        body: jsonEncode({'name': newName}),
+      );
+      if (!mounted) return;
+      if (res.statusCode == 200) {
+        await auth.updateTeamName(newName);
+      } else {
+        final msg = jsonDecode(res.body)['detail'] ?? 'Rename failed';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   Widget _buildHome(AuthProvider auth) {

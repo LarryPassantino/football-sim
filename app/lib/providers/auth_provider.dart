@@ -129,6 +129,13 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateTeamName(String name) async {
+    _teamName = name;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('team_name', name);
+    notifyListeners();
+  }
+
   Future<void> setActiveTeam(String teamId, String leagueId, String teamName) async {
     _teamId   = teamId;
     _leagueId = leagueId;

@@ -151,6 +151,10 @@ class ActivateRequest(BaseModel):
     activate_player_id: uuid.UUID
 
 
+class TeamRenameRequest(BaseModel):
+    name: str
+
+
 class ReleaseRequest(BaseModel):
     player_id: uuid.UUID
 

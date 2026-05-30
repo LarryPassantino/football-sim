@@ -16,7 +16,7 @@ from ..schemas import (
     LeagueDetailResponse, LeagueLeadersResponse, LeagueResponse, PassingLeader, PlayerRosterItem,
     PlayerScoutItem, PlayerStatLine, PlayerStatsResponse, ReceivingLeader, ReleaseRequest,
     ReleaseResponse, RushingLeader, SignFARequest, StandingRow, StandingsResponse, TeamMatchupSide,
-    TeamPickerItem, TeamResponse, TradeRequest, TradeResponse,
+    TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
 )
 from ..services.league_service import create_league
 
@@ -106,6 +106,37 @@ async def get_available_teams(league_id: uuid.UUID, db: AsyncSession = Depends(g
         ).order_by(Team.conference, Team.division, Team.name)
     )
     return result.scalars().all()
+
+
+@router.patch('/{league_id}/teams/{team_id}', response_model=TeamResponse)
+async def rename_team(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    body:      TeamRenameRequest,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id or team.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='Not your team')
+
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='Name cannot be empty')
+
+    result = await db.execute(
+        select(func.count()).where(
+            Team.league_id == league_id,
+            Team.name      == name,
+            Team.id        != team_id,
+        )
+    )
+    if result.scalar() > 0:
+        raise HTTPException(status_code=409, detail='That name is already taken in this league')
+
+    team.name = name
+    await db.commit()
+    return team
 
 
 @router.post('/{league_id}/teams/{team_id}/claim', response_model=TeamResponse)
