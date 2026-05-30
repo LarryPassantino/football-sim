@@ -198,13 +198,15 @@ async def get_roster(league_id: uuid.UUID, team_id: uuid.UUID, db: AsyncSession 
     items = []
     for p in result.scalars().all():
         stat_names = POSITION_STATS.get(p.position, [])
+        stat_dict  = dict(zip(stat_names, p.stats))
+        ordered    = _reorder_stats(stat_names)
         items.append(PlayerRosterItem(
             id=p.id,
             name=p.name,
             position=p.position,
             age=p.age,
             composite=p.composite,
-            named_stats={name: val for name, val in zip(stat_names, p.stats)},
+            named_stats={name: stat_dict[name] for name in ordered},
             injury_games_remaining=p.injury_games_remaining,
             on_ir=p.on_ir,
         ))
@@ -226,9 +228,11 @@ async def get_free_agents(league_id: uuid.UUID, db: AsyncSession = Depends(get_d
     result = await db.execute(
         select(Player)
         .where(Player.league_id == league_id, Player.team_id.is_(None))
-        .order_by(Player.position, Player.composite.desc())
+        .order_by(Player.position)
     )
-    return _to_scout_items(result.scalars().all())
+    items = _to_scout_items(result.scalars().all())
+    items.sort(key=lambda x: (x.position, _LABEL_ORDER.get(x.composite_label, 99), x.name))
+    return items
 
 
 _POSITION_MAX_ACTIVE = {
@@ -381,17 +385,32 @@ async def request_trade(
     return TradeResponse(accepted=True, reason='Trade accepted')
 
 
+_LABEL_ORDER  = {'Elite': 0, 'Above Avg': 1, 'Average': 2, 'Below Avg': 3, 'Weak': 4}
+_FITNESS_STATS = frozenset({'AGILITY', 'STAMINA', 'STRENGTH'})
+
+
+def _reorder_stats(stat_names: list[str]) -> list[str]:
+    if len(stat_names) <= 1:
+        return list(stat_names)
+    skill = stat_names[0]
+    rest  = stat_names[1:]
+    return [skill] + sorted(s for s in rest if s not in _FITNESS_STATS) \
+                   + sorted(s for s in rest if s in _FITNESS_STATS)
+
+
 def _to_scout_items(players) -> list[PlayerScoutItem]:
     items = []
     for p in players:
         stat_names = POSITION_STATS.get(p.position, [])
+        stat_dict  = dict(zip(stat_names, p.stats))
+        ordered    = _reorder_stats(stat_names)
         items.append(PlayerScoutItem(
             id=p.id,
             name=p.name,
             position=p.position,
             age=p.age,
             composite_label=assign_label(p.composite),
-            named_stat_labels={name: assign_label(val) for name, val in zip(stat_names, p.stats)},
+            named_stat_labels={name: assign_label(stat_dict[name]) for name in ordered},
             injury_games_remaining=p.injury_games_remaining,
         ))
     return items

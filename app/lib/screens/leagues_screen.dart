@@ -37,6 +37,7 @@ class _MyRecord {
 
 class _GameSummary {
   final String gameId;
+  final int week;
   final bool isHome;
   final String opponentId;
   final String opponentName;
@@ -47,6 +48,7 @@ class _GameSummary {
 
   _GameSummary({
     required this.gameId,
+    required this.week,
     required this.isHome,
     required this.opponentId,
     required this.opponentName,
@@ -84,7 +86,8 @@ class LeaguesScreen extends StatefulWidget {
 class _LeaguesScreenState extends State<LeaguesScreen> {
   _LeagueDetail? _league;
   _MyRecord? _record;
-  _GameSummary? _currentGame;
+  _GameSummary? _lastGame;
+  _GameSummary? _nextGame;
   List<_IrPlayer> _irPlayers = [];
   bool _loading = true;
   String? _error;
@@ -133,35 +136,37 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         }
       }
 
-      // Fetch current week's schedule
-      _GameSummary? gameSummary;
-      if (league.currentWeek != null) {
-        final scheduleRes = await http.get(
-          Uri.parse('$kBaseUrl/leagues/$leagueId/schedule?week=${league.currentWeek}'),
-          headers: auth.authHeaders,
-        );
-        if (scheduleRes.statusCode == 200) {
-          final games = jsonDecode(scheduleRes.body) as List;
-          for (final g in games) {
-            final game = g as Map<String, dynamic>;
-            final homeId = game['home_team_id'] as String;
-            final awayId = game['away_team_id'] as String;
-            if (homeId == teamId || awayId == teamId) {
-              final isHome   = homeId == teamId;
-              final oppId    = isHome ? awayId : homeId;
-              final isPlayed = game['status'] == 'complete';
-              gameSummary = _GameSummary(
-                gameId: game['id'] as String,
-                isHome: isHome,
-                opponentId: oppId,
-                opponentName: teamNames[oppId] ?? 'Unknown',
-                myScore: isPlayed ? (isHome ? game['home_score'] : game['away_score']) as int? : null,
-                opponentScore: isPlayed ? (isHome ? game['away_score'] : game['home_score']) as int? : null,
-                isPlayed: isPlayed,
-                isPlayoff: game['is_playoff'] as bool? ?? false,
-              );
-              break;
-            }
+      // Fetch full schedule to find last result and next game
+      _GameSummary? lastGame, nextGame;
+      final scheduleRes = await http.get(
+        Uri.parse('$kBaseUrl/leagues/$leagueId/schedule'),
+        headers: auth.authHeaders,
+      );
+      if (scheduleRes.statusCode == 200) {
+        final games = jsonDecode(scheduleRes.body) as List;
+        for (final g in games) {
+          final game   = g as Map<String, dynamic>;
+          final homeId = game['home_team_id'] as String;
+          final awayId = game['away_team_id'] as String;
+          if (homeId != teamId && awayId != teamId) continue;
+          final isHome   = homeId == teamId;
+          final oppId    = isHome ? awayId : homeId;
+          final isPlayed = game['status'] == 'complete';
+          final gs = _GameSummary(
+            gameId:        game['id'] as String,
+            week:          game['week'] as int,
+            isHome:        isHome,
+            opponentId:    oppId,
+            opponentName:  teamNames[oppId] ?? 'Unknown',
+            myScore:       isPlayed ? (isHome ? game['home_score'] : game['away_score']) as int? : null,
+            opponentScore: isPlayed ? (isHome ? game['away_score'] : game['home_score']) as int? : null,
+            isPlayed:      isPlayed,
+            isPlayoff:     game['is_playoff'] as bool? ?? false,
+          );
+          if (isPlayed) {
+            lastGame = gs;         // keep updating; last played wins
+          } else if (nextGame == null) {
+            nextGame = gs;         // first unplayed wins
           }
         }
       }
@@ -182,11 +187,12 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
       }
 
       setState(() {
-        _league      = league;
-        _record      = record;
-        _currentGame = gameSummary;
-        _irPlayers   = irPlayers;
-        _loading     = false;
+        _league    = league;
+        _record    = record;
+        _lastGame  = lastGame;
+        _nextGame  = nextGame;
+        _irPlayers = irPlayers;
+        _loading   = false;
       });
     } catch (e) {
       setState(() {
@@ -267,7 +273,11 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
       children: [
         _buildRecordCard(),
         const SizedBox(height: 16),
-        _buildCurrentGameCard(),
+        if (_lastGame != null) ...[
+          _buildLastResultCard(_lastGame!),
+          const SizedBox(height: 12),
+        ],
+        if (_nextGame != null) _buildNextGameCard(_nextGame!),
         _buildAlertsSection(auth),
         const SizedBox(height: 24),
         FilledButton.icon(
@@ -319,6 +329,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
               builder: (_) => ScheduleScreen(
                 leagueId: leagueId,
                 myTeamId: auth.teamId!,
+                initialWeek: _league?.currentWeek,
               ),
             ),
           ),
@@ -352,7 +363,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         icon: Icons.emoji_events,
         color: Colors.amber,
         title: 'Playoffs underway',
-        subtitle: _weekLabel(_league),
+        subtitle: _league?.currentWeek != null ? _weekLabel(_league!.currentWeek!) : null,
       ));
     } else if (status == 'offseason') {
       final days = _league?.offseasonDaysRemaining;
@@ -490,11 +501,8 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     );
   }
 
-  Widget _buildCurrentGameCard() {
-    final game = _currentGame;
-    final league = _league;
-    final weekLabel = _weekLabel(league);
-
+  Widget _buildLastResultCard(_GameSummary game) {
+    final label = _weekLabel(game.week);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -502,66 +510,81 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              weekLabel,
+              'LAST RESULT · $label',
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(height: 8),
-            if (game == null)
-              const Text('No game this week')
-            else if (game.isPlayed)
-              GestureDetector(
-                onTap: () {
-                  final auth = context.read<AuthProvider>();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => GameDetailScreen(
-                        leagueId: auth.leagueId!,
-                        gameId: game.gameId,
-                      ),
+            GestureDetector(
+              onTap: () {
+                final auth = context.read<AuthProvider>();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => GameDetailScreen(
+                      leagueId: auth.leagueId!,
+                      gameId: game.gameId,
                     ),
-                  );
-                },
-                child: _buildScoreLine(game),
-              )
-            else
-              InkWell(
-                onTap: () {
-                  final auth = context.read<AuthProvider>();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MatchupScreen(
-                        leagueId: auth.leagueId!,
-                        gameId: game.gameId,
-                        myTeamId: auth.teamId!,
-                        isHome: game.isHome,
-                        weekLabel: weekLabel,
-                      ),
-                    ),
-                  );
-                },
-                child: Row(
-                  children: [
-                    Text(
-                      '${game.isHome ? 'vs' : '@'}  ',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      game.opponentName,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const Spacer(),
-                    Icon(
-                      Icons.chevron_right,
-                      size: 18,
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                  ],
+                  ),
+                );
+              },
+              child: _buildScoreLine(game),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNextGameCard(_GameSummary game) {
+    final auth = context.read<AuthProvider>();
+    final label = _weekLabel(game.week);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'NEXT · $label',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MatchupScreen(
+                    leagueId: auth.leagueId!,
+                    gameId: game.gameId,
+                    myTeamId: auth.teamId!,
+                    isHome: game.isHome,
+                    weekLabel: label,
+                  ),
                 ),
               ),
+              child: Row(
+                children: [
+                  Text(
+                    '${game.isHome ? 'vs' : '@'}  ',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
+                    game.opponentName,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -617,14 +640,11 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     );
   }
 
-  String _weekLabel(_LeagueDetail? league) {
-    if (league == null) return 'This Week';
-    final w = league.currentWeek;
-    if (w == null) return 'This Week';
-    if (w <= 17) return 'Week $w';
-    if (w == 18) return 'Divisional Round';
-    if (w == 19) return 'Conference Championship';
-    if (w == 20) return 'League Championship';
-    return 'Offseason';
+  String _weekLabel(int week) {
+    if (week <= 17) return 'Week $week';
+    if (week == 18) return 'Divisional Round';
+    if (week == 19) return 'Conference Championship';
+    if (week == 20) return 'League Championship';
+    return 'Postseason';
   }
 }

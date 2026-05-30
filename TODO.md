@@ -2,7 +2,7 @@
 
 ## Up Next
 - [x] Team rename — PATCH endpoint + UI on team home screen
-- [ ] Season 2+ (no draft) — offseason → new season flow; clear old games, generate new schedule, reset week; players keep current rosters
+- [x] Season 2+ (no draft) — offseason → new season flow; clear old games, generate new schedule, reset week; players keep current rosters
 - [ ] Draft system — annual draft class; no roster limit immediately post-draft, but rosters must be trimmed to active limit before season start
 
 ## Gameplay

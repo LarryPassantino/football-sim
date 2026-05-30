@@ -32,8 +32,9 @@ class _Game {
 class ScheduleScreen extends StatefulWidget {
   final String leagueId;
   final String myTeamId;
+  final int? initialWeek;
 
-  const ScheduleScreen({super.key, required this.leagueId, required this.myTeamId});
+  const ScheduleScreen({super.key, required this.leagueId, required this.myTeamId, this.initialWeek});
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -43,6 +44,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   List<_Game>? _games;
   Map<String, String>? _teamNames;
   String? _error;
+  final _targetKey = GlobalKey();
 
   @override
   void initState() {
@@ -71,6 +73,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       }
 
       setState(() { _games = games; _teamNames = names; });
+      if (widget.initialWeek != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final ctx = _targetKey.currentContext;
+          if (ctx != null) {
+            Scrollable.ensureVisible(ctx, alignment: 0.0, duration: const Duration(milliseconds: 300));
+          }
+        });
+      }
     } catch (e) {
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
     }
@@ -123,7 +133,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       label = 'League Championship';
     }
 
+    final isTarget = week == widget.initialWeek;
     return Padding(
+      key: isTarget ? _targetKey : null,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Text(
         label,
