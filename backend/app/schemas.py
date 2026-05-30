@@ -221,13 +221,20 @@ class GroupComposite(BaseModel):
     label:     str
 
 
+class GamePlanRequest(BaseModel):
+    off_gameplan: str
+    def_gameplan: str
+
+
 class TeamMatchupSide(BaseModel):
-    team_id: uuid.UUID
-    name:    str
-    wins:    int
-    losses:  int
-    ties:    int
-    groups:  dict[str, GroupComposite]
+    team_id:      uuid.UUID
+    name:         str
+    wins:         int
+    losses:       int
+    ties:         int
+    groups:       dict[str, GroupComposite]
+    off_gameplan: str = 'balanced'
+    def_gameplan: str = 'balanced'
 
 
 class GameMatchupResponse(BaseModel):

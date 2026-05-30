@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sim.football_sim import ROSTER_SLOTS as SIM_SLOTS, simulate_game
+from sim.football_sim import ROSTER_SLOTS as SIM_SLOTS, apply_gameplan, simulate_game
 from sim.injury_sim import (
     build_game_day_sim_team, roll_pregame_injuries, tick_injuries,
 )
@@ -85,7 +85,20 @@ async def clear_all_injuries(db: AsyncSession, league_id) -> None:
     )
 
 
-async def play_game(db: AsyncSession, game: Game, home_team, away_team, games_remaining: int) -> None:
+_RUN_FACTORS = {'run_focus': 1.0, 'pass_focus': -1.0, 'balanced': 0.0}
+
+
+async def play_game(
+    db: AsyncSession,
+    game: Game,
+    home_team,
+    away_team,
+    games_remaining: int,
+    home_off_plan: str = 'balanced',
+    home_def_plan: str = 'balanced',
+    away_off_plan: str = 'balanced',
+    away_def_plan: str = 'balanced',
+) -> None:
     """
     Simulate a single game: roll injuries, build game-day rosters, run sim,
     write scores, injury state, and per-player stats back to DB.
@@ -96,10 +109,11 @@ async def play_game(db: AsyncSession, game: Game, home_team, away_team, games_re
     roll_pregame_injuries(home_sim, games_remaining)
     roll_pregame_injuries(away_sim, games_remaining)
 
+    home_gd = apply_gameplan(build_game_day_sim_team(home_sim), home_off_plan, home_def_plan)
+    away_gd = apply_gameplan(build_game_day_sim_team(away_sim), away_off_plan, away_def_plan)
+
     home_score, away_score, home_outcomes, away_outcomes = simulate_game(
-        build_game_day_sim_team(home_sim),
-        build_game_day_sim_team(away_sim),
-        is_playoff=game.is_playoff,
+        home_gd, away_gd, is_playoff=game.is_playoff,
     )
 
     tick_injuries(home_sim)
@@ -109,8 +123,14 @@ async def play_game(db: AsyncSession, game: Game, home_team, away_team, games_re
     await write_back_injuries(db, away_sim)
 
     # Generate and save per-player stats
-    home_off, away_def = generate_game_stats(home_sim, away_sim, dict(home_outcomes))
-    away_off, home_def = generate_game_stats(away_sim, home_sim, dict(away_outcomes))
+    home_off, away_def = generate_game_stats(
+        home_sim, away_sim, dict(home_outcomes),
+        run_factor=_RUN_FACTORS.get(home_off_plan, 0.0),
+    )
+    away_off, home_def = generate_game_stats(
+        away_sim, home_sim, dict(away_outcomes),
+        run_factor=_RUN_FACTORS.get(away_off_plan, 0.0),
+    )
     await _save_player_stats(db, game.id, home_team.id, home_off, home_def)
     await _save_player_stats(db, game.id, away_team.id, away_off, away_def)
 

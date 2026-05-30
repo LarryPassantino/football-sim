@@ -23,6 +23,8 @@ class _TeamSide {
   final int losses;
   final int ties;
   final Map<String, _GroupData> groups;
+  final String offGameplan;
+  final String defGameplan;
 
   _TeamSide.fromJson(Map<String, dynamic> j)
       : teamId = j['team_id'] as String,
@@ -33,7 +35,9 @@ class _TeamSide {
         groups = {
           for (final e in (j['groups'] as Map<String, dynamic>).entries)
             e.key: _GroupData.fromJson(e.value as Map<String, dynamic>)
-        };
+        },
+        offGameplan = j['off_gameplan'] as String? ?? 'balanced',
+        defGameplan = j['def_gameplan'] as String? ?? 'balanced';
 }
 
 class MatchupScreen extends StatefulWidget {
@@ -61,6 +65,9 @@ class _MatchupScreenState extends State<MatchupScreen> {
   _TeamSide? _away;
   bool _loading = true;
   String? _error;
+  String _offPlan = 'balanced';
+  String _defPlan = 'balanced';
+  bool _saving = false;
 
   static const _offensePositions = ['QB', 'WR', 'TE', 'RB', 'OL'];
   static const _defensePositions = ['DT', 'DE', 'LB', 'CB', 'S'];
@@ -81,10 +88,15 @@ class _MatchupScreenState extends State<MatchupScreen> {
       );
       if (res.statusCode != 200) throw Exception('Failed to load matchup');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final myTeamData = widget.isHome
+          ? data['home_team'] as Map<String, dynamic>
+          : data['away_team'] as Map<String, dynamic>;
       setState(() {
-        _home    = _TeamSide.fromJson(data['home_team'] as Map<String, dynamic>);
-        _away    = _TeamSide.fromJson(data['away_team'] as Map<String, dynamic>);
-        _loading = false;
+        _home     = _TeamSide.fromJson(data['home_team'] as Map<String, dynamic>);
+        _away     = _TeamSide.fromJson(data['away_team'] as Map<String, dynamic>);
+        _offPlan  = myTeamData['off_gameplan'] as String? ?? 'balanced';
+        _defPlan  = myTeamData['def_gameplan'] as String? ?? 'balanced';
+        _loading  = false;
       });
     } catch (e) {
       setState(() {
@@ -125,6 +137,8 @@ class _MatchupScreenState extends State<MatchupScreen> {
         const SizedBox(height: 20),
         _sectionLabel('DEFENSE'),
         ..._buildGroupRows(_defensePositions, myTeam, oppTeam),
+        const SizedBox(height: 28),
+        _buildGamePlanSection(),
       ],
     );
   }
@@ -215,6 +229,84 @@ class _MatchupScreenState extends State<MatchupScreen> {
           letterSpacing: 1.5,
         ),
       ),
+    );
+  }
+
+  Future<void> _saveGamePlan(String offPlan, String defPlan) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    final auth = context.read<AuthProvider>();
+    try {
+      final res = await http.patch(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.myTeamId}/gameplan'),
+        headers: auth.authHeaders,
+        body: jsonEncode({'off_gameplan': offPlan, 'def_gameplan': defPlan}),
+      );
+      if (!mounted) return;
+      if (res.statusCode == 204) {
+        setState(() { _offPlan = offPlan; _defPlan = defPlan; });
+      } else {
+        final msg = jsonDecode(res.body)['detail'] ?? 'Failed to save game plan';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _buildGamePlanSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel('GAME PLAN'),
+        const SizedBox(height: 4),
+        Text(
+          'OFFENSE',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        ),
+        const SizedBox(height: 6),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'balanced',   label: Text('Balanced')),
+            ButtonSegment(value: 'run_focus',  label: Text('Run Focus')),
+            ButtonSegment(value: 'pass_focus', label: Text('Pass Focus')),
+          ],
+          selected: {_offPlan},
+          showSelectedIcon: false,
+          onSelectionChanged: _saving ? null : (val) => _saveGamePlan(val.first, _defPlan),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'DEFENSE',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        ),
+        const SizedBox(height: 6),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'balanced',  label: Text('Balanced')),
+            ButtonSegment(value: 'run_stop',  label: Text('Run Stop')),
+            ButtonSegment(value: 'pass_rush', label: Text('Pass Rush')),
+          ],
+          selected: {_defPlan},
+          showSelectedIcon: false,
+          onSelectionChanged: _saving ? null : (val) => _saveGamePlan(_offPlan, val.first),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Resets to Balanced after each game.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        ),
+      ],
     );
   }
 

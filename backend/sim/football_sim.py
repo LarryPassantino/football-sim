@@ -59,6 +59,33 @@ AVERAGE_RATING  = 70
 
 POSITION_GROUPS = ['qb', 'wr', 'rb', 'ol', 'dt', 'de', 'lb', 'cb', 's', 'k']
 
+# --- Game plan composite modifiers (applied to flat team dict pre-sim) ---
+# OFF plans shift the run/pass emphasis by boosting the relevant position groups.
+# DEF plans shift run-stopping vs. pass-coverage priority.
+_OFF_GAMEPLAN_MODS = {
+    'balanced':   {},
+    'run_focus':  {'ol': 1.08, 'rb': 1.07, 'qb': 0.97, 'wr': 0.97},
+    'pass_focus': {'qb': 1.08, 'wr': 1.07, 'ol': 0.97, 'rb': 0.97},
+}
+_DEF_GAMEPLAN_MODS = {
+    'balanced':  {},
+    'run_stop':  {'dt': 1.08, 'lb': 1.06, 'cb': 0.95, 'de': 0.97},
+    'pass_rush': {'de': 1.09, 'cb': 1.05, 'dt': 0.96, 'lb': 0.95},
+}
+
+
+def apply_gameplan(team: dict, off_plan: str = 'balanced', def_plan: str = 'balanced') -> dict:
+    """Apply game plan multipliers to a flat team composite dict."""
+    result = dict(team)
+    for pos, mult in _OFF_GAMEPLAN_MODS.get(off_plan, {}).items():
+        if pos in result:
+            result[pos] = clamp(result[pos] * mult, 20, 99)
+    for pos, mult in _DEF_GAMEPLAN_MODS.get(def_plan, {}).items():
+        if pos in result:
+            result[pos] = clamp(result[pos] * mult, 20, 99)
+    return result
+
+
 # ============================================================
 # POSITION DEFINITIONS
 # Stat names in priority order (index 0 = SKILL = most important).

@@ -55,6 +55,7 @@ def generate_game_stats(
     offense_sim: dict,
     defense_sim: dict,
     outcomes: dict,
+    run_factor: float = 0.0,
 ) -> tuple[dict, dict]:
     """
     Probabilistic per-player stat distribution for one team's offensive series
@@ -72,8 +73,9 @@ def generate_game_stats(
     tds       = outcomes.get('touchdown', 0)
     turnovers = outcomes.get('turnover', 0)
 
-    # Split TDs and turnovers into type
-    pass_tds  = round(tds * 0.65)
+    # Split TDs and turnovers into type — run_factor shifts rush/pass balance
+    pass_td_ratio = max(0.35, min(0.85, 0.65 - run_factor * 0.15))
+    pass_tds  = round(tds * pass_td_ratio)
     rush_tds  = tds - pass_tds
     ints      = round(turnovers * 0.55)
     fum_lost  = turnovers - ints  # fumbles lost by ball carrier
@@ -81,11 +83,11 @@ def generate_game_stats(
     # Sacks: shared between OL sacks_allowed and DE/LB sacks
     sack_count = max(0, round(random.gauss(2.5, 1.2)))
 
-    # Net passing yards (after sack yardage deducted)
-    raw_pass = int(random.gauss(225, 55) + (tds - 2.5) * 18 - turnovers * 12)
+    # Net passing yards — run_focus lowers pass base, pass_focus raises it
+    raw_pass   = int(random.gauss(225 - run_factor * 30, 55) + (tds - 2.5) * 18 - turnovers * 12)
     pass_yards = max(20, raw_pass - sack_count * 7)
 
-    rush_yards = max(15, int(random.gauss(98, 32)))
+    rush_yards = max(15, int(random.gauss(98 + run_factor * 20, 32)))
 
     # Receiving yard split: WR 65%, TE 20%, RB 15%
     wr_yards = round(pass_yards * 0.65)

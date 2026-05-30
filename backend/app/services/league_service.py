@@ -326,7 +326,17 @@ async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
     for game in games:
         if game.status == GameStatus.complete:
             continue
-        await play_game(db, game, game.home_team, game.away_team, games_remaining)
+        await play_game(
+            db, game, game.home_team, game.away_team, games_remaining,
+            home_off_plan=game.home_team.off_gameplan,
+            home_def_plan=game.home_team.def_gameplan,
+            away_off_plan=game.away_team.off_gameplan,
+            away_def_plan=game.away_team.def_gameplan,
+        )
+        game.home_team.off_gameplan = 'balanced'
+        game.home_team.def_gameplan = 'balanced'
+        game.away_team.off_gameplan = 'balanced'
+        game.away_team.def_gameplan = 'balanced'
 
     await run_cpu_roster_moves(db, season)
 
@@ -374,7 +384,17 @@ async def _advance_playoff_week(db: AsyncSession, season: Season) -> dict:
     for game in games:
         if game.status == GameStatus.complete:
             continue
-        await play_game(db, game, game.home_team, game.away_team, gr)
+        await play_game(
+            db, game, game.home_team, game.away_team, gr,
+            home_off_plan=game.home_team.off_gameplan,
+            home_def_plan=game.home_team.def_gameplan,
+            away_off_plan=game.away_team.off_gameplan,
+            away_def_plan=game.away_team.def_gameplan,
+        )
+        game.home_team.off_gameplan = 'balanced'
+        game.home_team.def_gameplan = 'balanced'
+        game.away_team.off_gameplan = 'balanced'
+        game.away_team.def_gameplan = 'balanced'
 
     await run_cpu_roster_moves(db, season)
 

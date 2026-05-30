@@ -13,11 +13,11 @@ from sqlalchemy import func
 from ..models import Coach, Game, GameStatus, League, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team
 from ..schemas import (
     ActivateRequest, AvailableLeaguesResponse, DefenseLeader, GameDetailResponse,
-    GameMatchupResponse, GameResponse, GroupComposite, LeagueAvailableItem, LeagueCreateRequest,
-    LeagueDetailResponse, LeagueLeadersResponse, LeagueResponse, PassingLeader, PlayerRosterItem,
-    PlayerScoutItem, PlayerStatLine, PlayerStatsResponse, ReceivingLeader, ReleaseRequest,
-    ReleaseResponse, RushingLeader, SignFARequest, StandingRow, StandingsResponse, TeamMatchupSide,
-    TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
+    GameMatchupResponse, GamePlanRequest, GameResponse, GroupComposite, LeagueAvailableItem,
+    LeagueCreateRequest, LeagueDetailResponse, LeagueLeadersResponse, LeagueResponse, PassingLeader,
+    PlayerRosterItem, PlayerScoutItem, PlayerStatLine, PlayerStatsResponse, ReceivingLeader,
+    ReleaseRequest, ReleaseResponse, RushingLeader, SignFARequest, StandingRow, StandingsResponse,
+    TeamMatchupSide, TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
 )
 from ..services.league_service import create_league, OFFSEASON_DAYS
 
@@ -167,6 +167,32 @@ async def rename_team(
     team.name = name
     await db.commit()
     return team
+
+
+_VALID_OFF_PLANS = {'balanced', 'run_focus', 'pass_focus'}
+_VALID_DEF_PLANS = {'balanced', 'run_stop', 'pass_rush'}
+
+
+@router.patch('/{league_id}/teams/{team_id}/gameplan', status_code=204)
+async def set_gameplan(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    body:      GamePlanRequest,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    if body.off_gameplan not in _VALID_OFF_PLANS:
+        raise HTTPException(status_code=400, detail='Invalid offensive game plan')
+    if body.def_gameplan not in _VALID_DEF_PLANS:
+        raise HTTPException(status_code=400, detail='Invalid defensive game plan')
+
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id or team.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='Not your team')
+
+    team.off_gameplan = body.off_gameplan
+    team.def_gameplan = body.def_gameplan
+    await db.commit()
 
 
 @router.post('/{league_id}/teams/{team_id}/claim', response_model=TeamResponse)
@@ -607,6 +633,8 @@ async def get_game_matchup(
             losses=records[home_id]['losses'],
             ties=records[home_id]['ties'],
             groups=_compute_team_groups(home_players),
+            off_gameplan=game.home_team.off_gameplan,
+            def_gameplan=game.home_team.def_gameplan,
         ),
         away_team=TeamMatchupSide(
             team_id=away_id,
@@ -615,6 +643,8 @@ async def get_game_matchup(
             losses=records[away_id]['losses'],
             ties=records[away_id]['ties'],
             groups=_compute_team_groups(away_players),
+            off_gameplan=game.away_team.off_gameplan,
+            def_gameplan=game.away_team.def_gameplan,
         ),
     )
 

@@ -57,13 +57,15 @@ class Coach(Base):
 class Team(Base):
     __tablename__ = 'teams'
 
-    id:          Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    league_id:   Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), ForeignKey('leagues.id'), nullable=False)
-    name:        Mapped[str]            = mapped_column(String(100), nullable=False)
-    conference:  Mapped[str]            = mapped_column(String(50), nullable=False)
-    division:    Mapped[str]            = mapped_column(String(50), nullable=False)
-    is_cpu:      Mapped[bool]           = mapped_column(Boolean, default=True)
-    coach_id:    Mapped[uuid.UUID|None] = mapped_column(UUID(as_uuid=True), ForeignKey('coaches.id'), nullable=True)
+    id:           Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    league_id:    Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), ForeignKey('leagues.id'), nullable=False)
+    name:         Mapped[str]            = mapped_column(String(100), nullable=False)
+    conference:   Mapped[str]            = mapped_column(String(50), nullable=False)
+    division:     Mapped[str]            = mapped_column(String(50), nullable=False)
+    is_cpu:       Mapped[bool]           = mapped_column(Boolean, default=True)
+    coach_id:     Mapped[uuid.UUID|None] = mapped_column(UUID(as_uuid=True), ForeignKey('coaches.id'), nullable=True)
+    off_gameplan: Mapped[str]            = mapped_column(String(20), default='balanced', server_default='balanced')
+    def_gameplan: Mapped[str]            = mapped_column(String(20), default='balanced', server_default='balanced')
 
 
 class Player(Base):
