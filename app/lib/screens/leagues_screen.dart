@@ -16,11 +16,13 @@ class _LeagueDetail {
   final String name;
   final int? currentWeek;
   final String? seasonStatus;
+  final int? offseasonDaysRemaining;
 
   _LeagueDetail.fromJson(Map<String, dynamic> j)
       : name = j['name'],
         currentWeek = j['current_week'],
-        seasonStatus = j['season_status'];
+        seasonStatus = j['season_status'],
+        offseasonDaysRemaining = j['offseason_days_remaining'];
 }
 
 class _MyRecord {
@@ -353,11 +355,17 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         subtitle: _weekLabel(_league),
       ));
     } else if (status == 'offseason') {
+      final days = _league?.offseasonDaysRemaining;
+      final subtitle = days == null || days <= 0
+          ? 'New season starting soon'
+          : days == 1
+              ? 'New season starts tomorrow'
+              : 'New season starts in $days days';
       alerts.add(_alertTile(
         icon: Icons.sports_football,
         color: Theme.of(context).colorScheme.primary,
         title: 'Offseason',
-        subtitle: 'Prepare for the draft',
+        subtitle: subtitle,
       ));
     } else if (status == 'complete') {
       alerts.add(_alertTile(

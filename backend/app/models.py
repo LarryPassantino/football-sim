@@ -86,12 +86,13 @@ class Player(Base):
 class Season(Base):
     __tablename__ = 'seasons'
 
-    id:             Mapped[uuid.UUID]    = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    league_id:      Mapped[uuid.UUID]   = mapped_column(UUID(as_uuid=True), ForeignKey('leagues.id'), nullable=False)
-    season_number:  Mapped[int]         = mapped_column(Integer, nullable=False)
-    status:         Mapped[SeasonStatus]= mapped_column(default=SeasonStatus.regular)
-    current_week:   Mapped[int]         = mapped_column(Integer, default=1)
-    created_at:     Mapped[datetime]    = mapped_column(DateTime(timezone=True), default=_now)
+    id:             Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    league_id:      Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), ForeignKey('leagues.id'), nullable=False)
+    season_number:  Mapped[int]            = mapped_column(Integer, nullable=False)
+    status:         Mapped[SeasonStatus]   = mapped_column(default=SeasonStatus.regular)
+    current_week:   Mapped[int]            = mapped_column(Integer, default=1)
+    created_at:     Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=_now)
+    completed_at:   Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Game(Base):

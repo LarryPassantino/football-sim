@@ -38,12 +38,13 @@ class LeagueResponse(BaseModel):
 
 
 class LeagueDetailResponse(BaseModel):
-    id:            uuid.UUID
-    name:          str
-    status:        str
-    current_week:  int | None
-    season_status: str | None
-    created_at:    datetime
+    id:                       uuid.UUID
+    name:                     str
+    status:                   str
+    current_week:             int | None
+    season_status:            str | None
+    created_at:               datetime
+    offseason_days_remaining: int | None = None
 
 
 class TeamResponse(BaseModel):

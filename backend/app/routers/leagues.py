@@ -1,5 +1,6 @@
 import random
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_, select
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..dependencies import get_current_coach, get_db
 from sim.player_gen import POSITION_STATS, assign_label
 from sqlalchemy import func
-from ..models import Coach, Game, GameStatus, League, Player, PlayerGameStats, Season, Team
+from ..models import Coach, Game, GameStatus, League, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team
 from ..schemas import (
     ActivateRequest, AvailableLeaguesResponse, DefenseLeader, GameDetailResponse,
     GameMatchupResponse, GameResponse, GroupComposite, LeagueAvailableItem, LeagueCreateRequest,
@@ -18,7 +19,7 @@ from ..schemas import (
     ReleaseResponse, RushingLeader, SignFARequest, StandingRow, StandingsResponse, TeamMatchupSide,
     TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
 )
-from ..services.league_service import create_league
+from ..services.league_service import create_league, OFFSEASON_DAYS
 
 router = APIRouter(prefix='/leagues', tags=['leagues'])
 
@@ -79,15 +80,44 @@ async def get_league(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     league = await db.get(League, league_id)
     if not league:
         raise HTTPException(status_code=404, detail='League not found')
-    result = await db.execute(select(Season).where(Season.league_id == league_id))
-    season = result.scalar_one_or_none()
+
+    # Active season (regular or playoffs)
+    result = await db.execute(
+        select(Season).where(
+            Season.league_id == league_id,
+            Season.status    != SeasonStatus.complete,
+        )
+    )
+    active_season = result.scalar_one_or_none()
+
+    # Latest season (for offseason countdown)
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    latest_season = result.scalar_one_or_none()
+
+    offseason_days_remaining = None
+    if league.status == LeagueStatus.offseason and latest_season and latest_season.completed_at:
+        elapsed = (datetime.now(timezone.utc) - latest_season.completed_at).days
+        offseason_days_remaining = max(0, OFFSEASON_DAYS - elapsed)
+
+    season_status = None
+    if league.status == LeagueStatus.offseason:
+        season_status = 'offseason'
+    elif active_season:
+        season_status = active_season.status.value
+
     return LeagueDetailResponse(
         id=league.id,
         name=league.name,
         status=league.status,
-        current_week=season.current_week if season else None,
-        season_status=season.status.value if season else None,
+        current_week=active_season.current_week if active_season else None,
+        season_status=season_status,
         created_at=league.created_at,
+        offseason_days_remaining=offseason_days_remaining,
     )
 
 

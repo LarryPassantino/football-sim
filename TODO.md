@@ -18,6 +18,7 @@
 - [ ] Push notifications — alternative/supplement to the alerts board for IR returns, season phase changes
 
 ## Long-term / v3
-- [ ] Aging, decline, and retirement — age curves, fitness-weighted stat decay, retirement threshold
-- [ ] Annual draft class — generated rookie pool each offseason
+- [ ] Aging, decline, and retirement — age curves, fitness-weighted stat decay, retirement threshold (floor ~45 composite)
+- [ ] Annual draft class — smaller than season 1 pool (~60–70% size) to avoid FA pool inflation
+- [ ] FA pool management — roster-less decline: players in FA at end of season take an extra decline tick on top of normal age decay; players below composite floor retire out of the pool entirely; active signings by CPU + human drain mid-tier naturally
 - [ ] Cross-League Championship — Champions League style; season winners enter a playoff pool every 2–3 months, set starters, sim only

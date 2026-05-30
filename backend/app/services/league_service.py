@@ -1,6 +1,7 @@
 import random
 import uuid
 from collections import defaultdict
+from datetime import datetime, timezone
 from functools import cmp_to_key
 
 from sqlalchemy import func, select, or_
@@ -18,6 +19,7 @@ from ..models import (
 from .sim_bridge import clear_all_injuries, play_game
 
 REGULAR_SEASON_WEEKS = 17
+OFFSEASON_DAYS       = 4
 PLAYOFF_DIVISIONAL   = 18
 PLAYOFF_CONF_CHAMP   = 19
 PLAYOFF_LEAGUE_CHAMP = 20
@@ -458,8 +460,54 @@ async def end_season(db: AsyncSession, league_id: uuid.UUID) -> None:
                 career[f] = career.get(f, 0) + int(getattr(row, f) or 0)
             player.career_stats = career
 
-        season.status = SeasonStatus.complete
+        season.status       = SeasonStatus.complete
+        season.completed_at = datetime.now(timezone.utc)
 
     await clear_all_injuries(db, league_id)
     league.status = LeagueStatus.offseason
+    await db.commit()
+
+
+async def start_new_season(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """Create season N+1 with a fresh schedule. Players keep their current rosters."""
+    result = await db.execute(select(League).where(League.id == league_id))
+    league = result.scalar_one()
+
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    last_season = result.scalar_one()
+
+    result = await db.execute(
+        select(Team).where(Team.league_id == league_id).order_by(Team.id)
+    )
+    teams = result.scalars().all()
+
+    sim_teams      = [{'conference': t.conference, 'division': t.division} for t in teams]
+    team_idx_to_id = {i: t.id for i, t in enumerate(teams)}
+
+    new_season = Season(
+        league_id=league_id,
+        season_number=last_season.season_number + 1,
+        current_week=1,
+    )
+    db.add(new_season)
+    await db.flush()
+
+    schedule = build_schedule(sim_teams)
+    weeks    = _assign_weeks(schedule)
+
+    for week_num, games in weeks.items():
+        for h_idx, a_idx in games:
+            db.add(Game(
+                season_id=new_season.id,
+                week=week_num,
+                home_team_id=team_idx_to_id[h_idx],
+                away_team_id=team_idx_to_id[a_idx],
+            ))
+
+    league.status = LeagueStatus.regular
     await db.commit()
