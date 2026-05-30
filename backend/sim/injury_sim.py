@@ -81,7 +81,7 @@ def roll_pregame_injuries(draft_team, games_remaining):
     new_injuries = 0
 
     for pos, slots in SIM_SLOTS.items():
-        for player in roster[pos][:slots['starters']]:
+        for player in roster.get(pos, [])[:slots['starters']]:
             if new_injuries >= MAX_NEW_INJURIES_PER_GAME:
                 return
             if player.get('injury_games_remaining', 0) > 0:
@@ -120,7 +120,7 @@ def build_game_day_sim_team(draft_team):
     for pos, slots in SIM_SLOTS.items():
         n_start    = slots['starters']
         has_backup = slots['backups'] > 0
-        players    = roster[pos]
+        players    = roster.get(pos, [])
 
         healthy = [p for p in players[:n_start]
                    if p.get('injury_games_remaining', 0) == 0]
