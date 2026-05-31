@@ -83,7 +83,7 @@ class _LeagueBrowserScreenState extends State<LeagueBrowserScreen> {
       return const Center(child: Text('No leagues available'));
     }
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
       itemCount: _leagues!.length,
       separatorBuilder: (context, index) => const SizedBox(height: 8),
       itemBuilder: (context, i) {

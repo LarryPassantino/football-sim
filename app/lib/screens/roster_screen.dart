@@ -104,6 +104,7 @@ class _RosterScreenState extends State<RosterScreen> {
     }
 
     return ListView(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
       children: [
         for (final entry in _positionGroups.entries) ...[
           _groupHeader(entry.key),

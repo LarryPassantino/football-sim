@@ -93,7 +93,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
       children: [
         for (final conf in grouped.keys.toList()..sort()) ...[
           Text(

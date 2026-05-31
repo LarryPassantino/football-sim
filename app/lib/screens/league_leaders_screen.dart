@@ -55,6 +55,7 @@ class _LeagueLeadersScreenState extends State<LeagueLeadersScreen> {
 
   Widget _buildContent() {
     return ListView(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
       children: [
         _sectionHeader('Passing'),
         ...(_data!['passing'] as List).asMap().entries.map(

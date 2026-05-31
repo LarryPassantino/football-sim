@@ -146,7 +146,10 @@ class _ScoutScreenState extends State<ScoutScreen> {
 
     // Flat list when filtered to a single position
     if (_selectedPosition != null) {
-      return ListView(children: visible.map(_playerTile).toList());
+      return ListView(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        children: visible.map(_playerTile).toList(),
+      );
     }
 
     // Grouped view for ALL
@@ -156,6 +159,7 @@ class _ScoutScreenState extends State<ScoutScreen> {
     }
 
     return ListView(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
       children: [
         for (final entry in _positionGroups.entries) ...[
           _groupHeader(entry.key),

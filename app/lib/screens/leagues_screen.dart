@@ -276,7 +276,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
   Widget _buildHome(AuthProvider auth) {
     final leagueId = auth.leagueId!;
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
       children: [
         _buildRecordCard(),
         if (_headline != null) ...[

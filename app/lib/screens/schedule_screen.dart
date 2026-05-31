@@ -111,7 +111,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.only(top: 8, bottom: 8 + MediaQuery.of(context).padding.bottom),
       children: [
         for (final week in byWeek.keys.toList()..sort()) ...[
           _weekHeader(week),
