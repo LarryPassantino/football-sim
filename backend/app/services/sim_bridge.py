@@ -85,6 +85,20 @@ async def clear_all_injuries(db: AsyncSession, league_id) -> None:
     )
 
 
+async def _tick_ir_players(db: AsyncSession, team_id) -> None:
+    """Advance recovery for players already on IR. Called before each game so they
+    sit out the current game and their countdown decrements by 1."""
+    await db.execute(
+        update(Player)
+        .where(
+            Player.team_id == team_id,
+            Player.on_ir == True,           # noqa: E712
+            Player.injury_games_remaining > 0,
+        )
+        .values(injury_games_remaining=Player.injury_games_remaining - 1)
+    )
+
+
 _RUN_FACTORS = {'run_focus': 1.0, 'pass_focus': -1.0, 'balanced': 0.0}
 
 
@@ -103,6 +117,12 @@ async def play_game(
     Simulate a single game: roll injuries, build game-day rosters, run sim,
     write scores, injury state, and per-player stats back to DB.
     """
+    # Tick existing IR players' recovery before game processing so their countdown
+    # advances each game. Newly injured players (not yet on IR) are ticked by the
+    # separate tick_injuries call below after the game resolves.
+    await _tick_ir_players(db, home_team.id)
+    await _tick_ir_players(db, away_team.id)
+
     home_sim = await load_team_as_sim_dict(db, home_team)
     away_sim = await load_team_as_sim_dict(db, away_team)
 
