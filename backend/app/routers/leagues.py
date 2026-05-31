@@ -949,14 +949,15 @@ async def get_team_news(
         candidates.append((1, f'{name} are devastated as {ir_elite.name} ({ir_elite.position}) heads to injured reserve.'))
 
     # Generic fallback
+    record_str = f'{wins}–{losses}–{ties}' if ties > 0 else f'{wins}–{losses}'
     if last_r == 'W':
-        candidates.append((0, f'{name} pick up a win against {opp_name} ({score_str}), improving to {wins}–{losses}.'))
+        candidates.append((0, f'{name} pick up a win against {opp_name} ({score_str}), improving to {record_str}.'))
     elif last_r == 'L':
         margin = opp_s - my_s
         if margin <= 4:
             candidates.append((0, f'{name} fell just short against {opp_name}, losing {score_str}.'))
         else:
-            candidates.append((0, f'{name} dropped a {score_str} game to {opp_name}, falling to {wins}–{losses}.'))
+            candidates.append((0, f'{name} dropped a {score_str} game to {opp_name}, falling to {record_str}.'))
     else:
         candidates.append((0, f'{name} and {opp_name} played to a {score_str} draw.'))
 

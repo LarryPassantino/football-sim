@@ -542,7 +542,12 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
   }
 
   Widget _buildLastResultCard(_GameSummary game) {
+    final auth = context.read<AuthProvider>();
     final label = _weekLabel(game.week);
+    final myScore  = game.myScore  ?? 0;
+    final oppScore = game.opponentScore ?? 0;
+    final won  = myScore > oppScore;
+    final lost = myScore < oppScore;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -556,20 +561,38 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () {
-                final auth = context.read<AuthProvider>();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GameDetailScreen(
-                      leagueId: auth.leagueId!,
-                      gameId: game.gameId,
+            InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GameDetailScreen(
+                    leagueId: auth.leagueId!,
+                    gameId: game.gameId,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    won ? 'W' : lost ? 'L' : 'T',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: won ? Colors.green : lost ? Colors.red : Colors.grey,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                );
-              },
-              child: _buildScoreLine(game),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${game.myScore}–${game.opponentScore}  ${game.isHome ? 'vs' : '@'}  ${game.opponentName}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.open_in_new,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -618,7 +641,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                   ),
                   const Spacer(),
                   Icon(
-                    Icons.chevron_right,
+                    Icons.open_in_new,
                     size: 18,
                     color: Theme.of(context).colorScheme.outline,
                   ),
@@ -631,54 +654,6 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     );
   }
 
-  Widget _buildScoreLine(_GameSummary game) {
-    final myScore  = game.myScore  ?? 0;
-    final oppScore = game.opponentScore ?? 0;
-    final won  = myScore > oppScore;
-    final lost = myScore < oppScore;
-    return Row(
-      children: [
-        Text(
-          won ? 'W' : lost ? 'L' : 'T',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: won ? Colors.green : lost ? Colors.red : Colors.grey,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          '${game.myScore}–${game.opponentScore}  ${game.isHome ? 'vs' : '@'}  ',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        _opponentLink(game),
-      ],
-    );
-  }
-
-  Widget _opponentLink(_GameSummary game) {
-    final auth = context.read<AuthProvider>();
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ScoutScreen(
-            leagueId: auth.leagueId!,
-            teamId: game.opponentId,
-            title: game.opponentName,
-            myTeamId: auth.teamId!,
-          ),
-        ),
-      ),
-      child: Text(
-        game.opponentName,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          decoration: TextDecoration.underline,
-          decorationColor: Theme.of(context).colorScheme.primary,
-        ),
-      ),
-    );
-  }
 
   String _weekLabel(int week) {
     if (week <= 17) return 'Week $week';
