@@ -17,9 +17,13 @@ from ..schemas import (
     LeagueCreateRequest, LeagueDetailResponse, LeagueLeadersResponse, LeagueResponse, PassingLeader,
     PlayerRosterItem, PlayerScoutItem, PlayerStatLine, PlayerStatsResponse, ReceivingLeader,
     ReleaseRequest, ReleaseResponse, RushingLeader, SignFARequest, StandingRow, StandingsResponse,
-    TeamMatchupSide, TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
+    TeamMatchupSide, TeamNewsResponse, TeamPickerItem, TeamRenameRequest, TeamResponse,
+    TradeRequest, TradeResponse,
 )
-from ..services.league_service import create_league, OFFSEASON_DAYS
+from ..services.league_service import (
+    create_league, OFFSEASON_DAYS,
+    PLAYOFF_DIVISIONAL, PLAYOFF_CONF_CHAMP, PLAYOFF_LEAGUE_CHAMP,
+)
 
 router = APIRouter(prefix='/leagues', tags=['leagues'])
 
@@ -751,6 +755,214 @@ async def get_player_stats(
         ytd=ytd,
         career={f: int(player.career_stats.get(f, 0)) for f in _STAT_FIELDS},
     )
+
+
+_UPSET_THRESHOLDS = [(4, 4), (8, 6), (12, 8), (17, 10)]
+
+
+def _upset_delta(week: int) -> int:
+    for max_week, delta in _UPSET_THRESHOLDS:
+        if week <= max_week:
+            return delta
+    return 10
+
+
+@router.get('/{league_id}/teams/{team_id}/news', response_model=TeamNewsResponse)
+async def get_team_news(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    db:        AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    season = result.scalar_one_or_none()
+    team   = await db.get(Team, team_id)
+    if not season or not team:
+        return TeamNewsResponse(headline=f'No news yet.')
+
+    # All completed games for this team this season, oldest first
+    result = await db.execute(
+        select(Game)
+        .where(
+            Game.season_id == season.id,
+            Game.status    == GameStatus.complete,
+            or_(Game.home_team_id == team_id, Game.away_team_id == team_id),
+        )
+        .order_by(Game.week)
+    )
+    completed = result.scalars().all()
+
+    if not completed:
+        return TeamNewsResponse(headline=f'{team.name} are preparing for their first game of the season.')
+
+    # Record + result sequence
+    wins = losses = ties = 0
+    seq  = []
+    for g in completed:
+        home    = g.home_team_id == team_id
+        my_s    = g.home_score if home else g.away_score
+        opp_s   = g.away_score if home else g.home_score
+        if my_s > opp_s:
+            wins  += 1; seq.append('W')
+        elif opp_s > my_s:
+            losses += 1; seq.append('L')
+        else:
+            ties  += 1; seq.append('T')
+
+    # Streak
+    streak_type  = seq[-1]
+    streak_count = 0
+    for r in reversed(seq):
+        if r == streak_type:
+            streak_count += 1
+        else:
+            break
+
+    # Last game
+    last   = completed[-1]
+    last_r = seq[-1]
+    home   = last.home_team_id == team_id
+    opp_id = last.away_team_id if home else last.home_team_id
+    my_s   = last.home_score if home else last.away_score
+    opp_s  = last.away_score if home else last.home_score
+    score_str = f'{my_s}–{opp_s}'
+
+    opp_team = await db.get(Team, opp_id)
+    opp_name = opp_team.name if opp_team else 'the opponent'
+
+    # Star performer from last game
+    result = await db.execute(
+        select(PlayerGameStats)
+        .where(
+            PlayerGameStats.game_id == last.id,
+            PlayerGameStats.team_id == team_id,
+        )
+        .options(selectinload(PlayerGameStats.player))
+    )
+    stats     = result.scalars().all()
+    star_line = None
+    best_score = 0
+    for s in stats:
+        cand, score = None, 0
+        if s.pass_tds >= 3:
+            cand  = f'{s.player.name} threw for {s.pass_yards} yards and {s.pass_tds} TDs'
+            score = s.pass_tds * 10 + s.pass_yards // 10
+        elif s.interceptions >= 2:
+            cand  = f'{s.player.name} picked off {s.interceptions} passes'
+            score = s.interceptions * 15
+        elif s.rush_yards >= 130:
+            cand  = f'{s.player.name} rushed for {s.rush_yards} yards'
+            score = s.rush_yards
+        elif s.receiving_yards >= 130:
+            cand  = f'{s.player.name} hauled in {s.receiving_yards} receiving yards'
+            score = s.receiving_yards
+        elif s.sacks >= 2:
+            cand  = f'{s.player.name} recorded {s.sacks} sacks'
+            score = s.sacks * 20
+        elif s.tackles >= 10:
+            cand  = f'{s.player.name} racked up {s.tackles} tackles'
+            score = s.tackles
+        if cand and score > best_score:
+            star_line  = cand
+            best_score = score
+
+    # Elite player on IR
+    result = await db.execute(
+        select(Player).where(
+            Player.team_id == team_id,
+            Player.on_ir   == True,  # noqa: E712
+        )
+    )
+    ir_elite = next(
+        (p for p in result.scalars().all() if assign_label(p.composite) == 'Elite'),
+        None,
+    )
+
+    # Opponent pre-game record (for upset detection)
+    opp_wins_before = 0
+    if not last.is_playoff:
+        result = await db.execute(
+            select(Game).where(
+                Game.season_id == season.id,
+                Game.status    == GameStatus.complete,
+                Game.id        != last.id,
+                or_(Game.home_team_id == opp_id, Game.away_team_id == opp_id),
+            )
+        )
+        for g in result.scalars().all():
+            oh = g.home_team_id == opp_id
+            if (g.home_score if oh else g.away_score) > (g.away_score if oh else g.home_score):
+                opp_wins_before += 1
+
+    # ── Assemble candidates ──────────────────────────────────────────────────
+    # Priority 2 = playoff milestone (always wins)
+    # Priority 1 = all other interesting events (random among tied)
+    # Priority 0 = generic fallback
+    candidates: list[tuple[int, str]] = []
+    name = team.name
+
+    # Playoff milestones
+    played_playoff = any(g.is_playoff for g in completed)
+    if season.status == SeasonStatus.playoffs and not played_playoff:
+        candidates.append((2, f'{name} have punched their ticket to the playoffs!'))
+    elif last.is_playoff:
+        w = last.week
+        if   last_r == 'W' and w == PLAYOFF_LEAGUE_CHAMP:
+            candidates.append((2, f'The {name} are CHAMPIONS! What a season to remember.'))
+        elif last_r == 'L' and w == PLAYOFF_LEAGUE_CHAMP:
+            candidates.append((2, f'{name} came so close — a heartbreaking championship loss ends the run.'))
+        elif last_r == 'W' and w == PLAYOFF_CONF_CHAMP:
+            candidates.append((2, f'{name} are headed to the Championship Game!'))
+        elif last_r == 'L' and w == PLAYOFF_CONF_CHAMP:
+            candidates.append((2, f'Heartbreak for {name} — they fall just short of the Championship Game.'))
+        elif last_r == 'W' and w == PLAYOFF_DIVISIONAL:
+            candidates.append((2, f'{name} keep the championship dream alive with a first-round win.'))
+        elif last_r == 'L' and w == PLAYOFF_DIVISIONAL:
+            candidates.append((2, f"{name}'s season ends with a first-round playoff exit."))
+
+    # Streak
+    if streak_count >= 3 and streak_type == 'W':
+        candidates.append((1, f'{name} have won {streak_count} straight. This team is building real momentum.'))
+    elif streak_count >= 3 and streak_type == 'L':
+        candidates.append((1, f'{name} have lost {streak_count} in a row. Fans are growing restless.'))
+
+    # Upset
+    if not last.is_playoff:
+        my_wins_before = wins - (1 if last_r == 'W' else 0)
+        threshold = _upset_delta(last.week)
+        if last_r == 'L' and (my_wins_before - opp_wins_before) >= threshold:
+            candidates.append((1, f'Shocking upset — {opp_name} knock off {name} in one of the week\'s biggest surprises.'))
+        elif last_r == 'W' and (opp_wins_before - my_wins_before) >= threshold:
+            candidates.append((1, f'{name} pull off one of the season\'s biggest upsets, beating {opp_name}.'))
+
+    # Star performer
+    if star_line:
+        result_word = 'a win' if last_r == 'W' else 'a loss' if last_r == 'L' else 'a tie'
+        candidates.append((1, f'{star_line} in {result_word} against {opp_name}.'))
+
+    # Elite injury
+    if ir_elite:
+        candidates.append((1, f'{name} are devastated as {ir_elite.name} ({ir_elite.position}) heads to injured reserve.'))
+
+    # Generic fallback
+    if last_r == 'W':
+        candidates.append((0, f'{name} pick up a win against {opp_name} ({score_str}), improving to {wins}–{losses}.'))
+    elif last_r == 'L':
+        margin = opp_s - my_s
+        if margin <= 4:
+            candidates.append((0, f'{name} fell just short against {opp_name}, losing {score_str}.'))
+        else:
+            candidates.append((0, f'{name} dropped a {score_str} game to {opp_name}, falling to {wins}–{losses}.'))
+    else:
+        candidates.append((0, f'{name} and {opp_name} played to a {score_str} draw.'))
+
+    top_priority = max(p for p, _ in candidates)
+    top = [h for p, h in candidates if p == top_priority]
+    return TeamNewsResponse(headline=random.choice(top))
 
 
 @router.get('/{league_id}/leaders', response_model=LeagueLeadersResponse)

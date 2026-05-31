@@ -88,6 +88,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
   _MyRecord? _record;
   _GameSummary? _lastGame;
   _GameSummary? _nextGame;
+  String? _headline;
   List<_IrPlayer> _irPlayers = [];
   bool _loading = true;
   String? _error;
@@ -105,15 +106,20 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     final teamId   = auth.teamId!;
 
     try {
-      // Fetch league detail, standings, and roster in parallel
+      // Fetch league detail, standings, roster, and news in parallel
       final responses = await Future.wait([
         http.get(Uri.parse('$kBaseUrl/leagues/$leagueId'), headers: auth.authHeaders),
         http.get(Uri.parse('$kBaseUrl/leagues/$leagueId/standings'), headers: auth.authHeaders),
         http.get(Uri.parse('$kBaseUrl/leagues/$leagueId/teams/$teamId/roster'), headers: auth.authHeaders),
+        http.get(Uri.parse('$kBaseUrl/leagues/$leagueId/teams/$teamId/news'), headers: auth.authHeaders),
       ]);
 
       if (responses[0].statusCode != 200) throw Exception('Failed to load league');
       if (responses[1].statusCode != 200) throw Exception('Failed to load standings');
+
+      final headline = responses[3].statusCode == 200
+          ? (jsonDecode(responses[3].body) as Map<String, dynamic>)['headline'] as String?
+          : null;
 
       final leagueJson   = jsonDecode(responses[0].body) as Map<String, dynamic>;
       final standingsJson = jsonDecode(responses[1].body);
@@ -191,6 +197,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         _record    = record;
         _lastGame  = lastGame;
         _nextGame  = nextGame;
+        _headline  = headline;
         _irPlayers = irPlayers;
         _loading   = false;
       });
@@ -272,6 +279,10 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
       padding: const EdgeInsets.all(24),
       children: [
         _buildRecordCard(),
+        if (_headline != null) ...[
+          const SizedBox(height: 12),
+          _buildHeadlineCard(_headline!),
+        ],
         const SizedBox(height: 16),
         if (_lastGame != null) ...[
           _buildLastResultCard(_lastGame!),
@@ -495,6 +506,35 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeadlineCard(String headline) {
+    return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.newspaper,
+              size: 16,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                headline,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           ],
         ),
       ),

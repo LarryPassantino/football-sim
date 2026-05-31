@@ -296,6 +296,10 @@ class LeagueLeadersResponse(BaseModel):
     defense:   list[DefenseLeader]
 
 
+class TeamNewsResponse(BaseModel):
+    headline: str
+
+
 class CoachTeamItem(BaseModel):
     team_id:    uuid.UUID
     team_name:  str
