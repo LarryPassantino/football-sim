@@ -290,10 +290,12 @@ class DefenseLeader(BaseModel):
 
 
 class LeagueLeadersResponse(BaseModel):
-    passing:   list[PassingLeader]
-    rushing:   list[RushingLeader]
-    receiving: list[ReceivingLeader]
-    defense:   list[DefenseLeader]
+    passing:         list[PassingLeader]
+    rushing:         list[RushingLeader]
+    receiving:       list[ReceivingLeader]
+    def_tackles:     list[DefenseLeader]
+    def_sacks:       list[DefenseLeader]
+    def_interceptions: list[DefenseLeader]
 
 
 class TeamNewsResponse(BaseModel):

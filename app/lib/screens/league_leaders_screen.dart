@@ -69,10 +69,30 @@ class _LeagueLeadersScreenState extends State<LeagueLeadersScreen> {
         ...(_data!['receiving'] as List).asMap().entries.map(
           (e) => _leaderRow(e.key + 1, e.value as Map<String, dynamic>, _receivingStats(e.value)),
         ),
-        _sectionHeader('Defense'),
-        ...(_data!['defense'] as List).asMap().entries.map(
+        _sectionHeader('Defense · Tackles'),
+        ...(_data!['def_tackles'] as List).asMap().entries.map(
           (e) => _leaderRow(e.key + 1, e.value as Map<String, dynamic>, _defenseStats(e.value)),
         ),
+        _sectionHeader('Defense · Sacks'),
+        if ((_data!['def_sacks'] as List).isEmpty)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Text('No sacks recorded yet', style: TextStyle(fontStyle: FontStyle.italic)),
+          )
+        else
+          ...(_data!['def_sacks'] as List).asMap().entries.map(
+            (e) => _leaderRow(e.key + 1, e.value as Map<String, dynamic>, _defenseStats(e.value)),
+          ),
+        _sectionHeader('Defense · Interceptions'),
+        if ((_data!['def_interceptions'] as List).isEmpty)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Text('No interceptions recorded yet', style: TextStyle(fontStyle: FontStyle.italic)),
+          )
+        else
+          ...(_data!['def_interceptions'] as List).asMap().entries.map(
+            (e) => _leaderRow(e.key + 1, e.value as Map<String, dynamic>, _defenseStats(e.value)),
+          ),
       ],
     );
   }

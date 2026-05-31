@@ -1048,11 +1048,20 @@ async def get_league_leaders(league_id: uuid.UUID, db: AsyncSession = Depends(ge
     passing.sort(key=lambda x: x.pass_yards, reverse=True)
     rushing.sort(key=lambda x: x.rush_yards, reverse=True)
     receiving.sort(key=lambda x: x.receiving_yards, reverse=True)
-    defense.sort(key=lambda x: x.tackles, reverse=True)
+
+    def_tackles = sorted(defense, key=lambda x: x.tackles, reverse=True)[:10]
+    def_sacks   = sorted(
+        [d for d in defense if d.sacks > 0], key=lambda x: x.sacks, reverse=True
+    )[:10]
+    def_ints    = sorted(
+        [d for d in defense if d.interceptions > 0], key=lambda x: x.interceptions, reverse=True
+    )[:10]
 
     return LeagueLeadersResponse(
         passing=passing[:10],
         rushing=rushing[:10],
         receiving=receiving[:10],
-        defense=defense[:10],
+        def_tackles=def_tackles,
+        def_sacks=def_sacks,
+        def_interceptions=def_ints,
     )
