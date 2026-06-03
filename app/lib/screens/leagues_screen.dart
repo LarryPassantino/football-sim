@@ -340,7 +340,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
               builder: (_) => ScheduleScreen(
                 leagueId: leagueId,
                 myTeamId: auth.teamId!,
-                initialWeek: _league?.currentWeek,
+                initialWeek: _lastGame?.week ?? _league?.currentWeek,
               ),
             ),
           ),

@@ -75,10 +75,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       setState(() { _games = games; _teamNames = names; });
       if (widget.initialWeek != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          final ctx = _targetKey.currentContext;
-          if (ctx != null) {
-            Scrollable.ensureVisible(ctx, alignment: 0.0, duration: const Duration(milliseconds: 300));
-          }
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final ctx = _targetKey.currentContext;
+            if (ctx != null) {
+              Scrollable.ensureVisible(ctx, alignment: 0.0, duration: const Duration(milliseconds: 300));
+            }
+          });
         });
       }
     } catch (e) {
