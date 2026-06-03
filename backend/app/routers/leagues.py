@@ -266,8 +266,8 @@ async def get_free_agents(league_id: uuid.UUID, db: AsyncSession = Depends(get_d
 
 
 _POSITION_MAX_ACTIVE = {
-    'QB': 2, 'WR': 4, 'TE': 2, 'RB': 2, 'OL': 6,
-    'DT': 3, 'DE': 3, 'LB': 4, 'CB': 3, 'S': 3,
+    'QB': 2, 'WR': 5, 'TE': 2, 'RB': 3, 'OL': 6,
+    'DT': 4, 'DE': 4, 'LB': 5, 'CB': 4, 'S': 4,
     'K': 1, 'P': 1,
 }
 
@@ -316,21 +316,34 @@ async def activate_ir_player(
     if not team or team.league_id != league_id or team.coach_id != coach.id:
         raise HTTPException(status_code=403, detail='Not your team')
 
-    drop     = await db.get(Player, body.drop_player_id)
     activate = await db.get(Player, body.activate_player_id)
-
-    if not drop or drop.team_id != team_id or drop.on_ir:
-        raise HTTPException(status_code=400, detail='Drop player must be active on your roster')
     if not activate or activate.team_id != team_id or not activate.on_ir:
         raise HTTPException(status_code=400, detail='Activate player must be on IR on your roster')
     if activate.injury_games_remaining > 0:
         raise HTTPException(status_code=400, detail='Player not yet recovered')
-    if drop.position != activate.position:
-        raise HTTPException(status_code=400, detail=f'Must drop a {activate.position} to activate a {activate.position}')
 
-    drop.team_id    = None
-    drop.on_ir      = False
-    activate.on_ir  = False
+    if body.drop_player_id is None:
+        result = await db.execute(
+            select(func.count()).where(
+                Player.team_id  == team_id,
+                Player.on_ir    == False,   # noqa: E712
+                Player.position == activate.position,
+            )
+        )
+        if result.scalar() >= _POSITION_MAX_ACTIVE.get(activate.position, 0):
+            raise HTTPException(status_code=409,
+                detail=f'Position full — drop an active {activate.position} to activate')
+    else:
+        drop = await db.get(Player, body.drop_player_id)
+        if not drop or drop.team_id != team_id or drop.on_ir:
+            raise HTTPException(status_code=400, detail='Drop player must be active on your roster')
+        if drop.position != activate.position:
+            raise HTTPException(status_code=400,
+                detail=f'Must drop a {activate.position} to activate a {activate.position}')
+        drop.team_id = None
+        drop.on_ir   = False
+
+    activate.on_ir = False
     await db.commit()
 
 

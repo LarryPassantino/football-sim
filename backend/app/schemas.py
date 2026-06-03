@@ -20,6 +20,10 @@ class TokenResponse(BaseModel):
     token_type: str = 'bearer'
 
 
+class FcmTokenRequest(BaseModel):
+    token: str
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
@@ -148,7 +152,7 @@ class SignFARequest(BaseModel):
 
 
 class ActivateRequest(BaseModel):
-    drop_player_id:     uuid.UUID
+    drop_player_id:     uuid.UUID | None = None
     activate_player_id: uuid.UUID
 
 

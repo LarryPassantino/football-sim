@@ -10,14 +10,15 @@ import random
 from collections import defaultdict
 
 
-def _distribute(players: list, total: int) -> dict:
+def _distribute(players: list, total: int, power: float = 1.0) -> dict:
     """
-    Distribute an integer total among players proportional to composite.
+    Distribute an integer total among players proportional to composite^power.
+    power=1.0 is linear; power=2.0 steepens the curve toward top players.
     Returns {db_id: value}. Rounding error goes to the highest-composite player.
     """
     if not players or total <= 0:
         return {}
-    total_comp = sum(p['composite'] for p in players)
+    total_comp = sum(p['composite'] ** power for p in players)
     if total_comp == 0:
         share = total // len(players)
         return {p['_db_id']: share for p in players}
@@ -28,7 +29,7 @@ def _distribute(players: list, total: int) -> dict:
         if i == len(players) - 1:
             result[p['_db_id']] = max(0, total - running)
         else:
-            share = round(total * p['composite'] / total_comp)
+            share = round(total * p['composite'] ** power / total_comp)
             result[p['_db_id']] = share
             running += share
     return result
@@ -84,10 +85,10 @@ def generate_game_stats(
     sack_count = max(0, round(random.gauss(2.5, 1.2)))
 
     # Net passing yards — run_focus lowers pass base, pass_focus raises it
-    raw_pass   = int(random.gauss(225 - run_factor * 30, 55) + (tds - 2.5) * 18 - turnovers * 12)
+    raw_pass   = int(random.gauss(270 - run_factor * 30, 55) + (tds - 2.5) * 18 - turnovers * 12)
     pass_yards = max(20, raw_pass - sack_count * 7)
 
-    rush_yards = max(15, int(random.gauss(98 + run_factor * 20, 32)))
+    rush_yards = max(15, int(random.gauss(115 + run_factor * 20, 32)))
 
     # Receiving yard split: WR 65%, TE 20%, RB 15%
     wr_yards = round(pass_yards * 0.65)
@@ -128,11 +129,11 @@ def generate_game_stats(
             off[qb['_db_id']]['rush_tds'] = 1
             rush_tds -= 1
 
-    # WRs — receiving
+    # WRs — receiving (power=2.0 concentrates yards on the top receiver realistically)
     if wrs:
-        for pid, val in _distribute(wrs, wr_yards).items():
+        for pid, val in _distribute(wrs, wr_yards, power=2.0).items():
             off[pid]['receiving_yards'] += val
-        for pid, val in _distribute(wrs, wr_recs).items():
+        for pid, val in _distribute(wrs, wr_recs, power=2.0).items():
             off[pid]['receptions'] += val
 
     # TEs — receiving
@@ -142,16 +143,16 @@ def generate_game_stats(
         for pid, val in _distribute(tes, te_recs).items():
             off[pid]['receptions'] += val
 
-    # RBs — rushing + receiving
+    # RBs — rushing + receiving (power=2.0 so starter gets workhorse share)
     if rbs:
         rush_att = max(5, round(rb_rush / max(1, random.gauss(4.2, 0.7))))
-        for pid, val in _distribute(rbs, rb_rush).items():
+        for pid, val in _distribute(rbs, rb_rush, power=2.0).items():
             off[pid]['rush_yards'] += val
-        for pid, val in _distribute(rbs, rush_att).items():
+        for pid, val in _distribute(rbs, rush_att, power=2.0).items():
             off[pid]['rush_attempts'] += val
-        for pid, val in _distribute(rbs, rb_yards).items():
+        for pid, val in _distribute(rbs, rb_yards, power=2.0).items():
             off[pid]['receiving_yards'] += val
-        for pid, val in _distribute(rbs, rb_recs).items():
+        for pid, val in _distribute(rbs, rb_recs, power=2.0).items():
             off[pid]['receptions'] += val
 
     # Receiving TDs — WR 65%, TE 20%, RB 15%

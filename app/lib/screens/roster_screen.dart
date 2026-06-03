@@ -264,16 +264,24 @@ class _RosterScreenState extends State<RosterScreen> {
     );
   }
 
+  static const _positionMax = {
+    'QB': 2, 'WR': 5, 'TE': 2, 'RB': 3, 'OL': 6,
+    'DT': 4, 'DE': 4, 'LB': 5, 'CB': 4, 'S': 4, 'K': 1, 'P': 1,
+  };
+
   void _showActivateDialog(_Player irPlayer) {
-    final candidates = _players!
+    final activeAtPos = _players!
         .where((p) => p.position == irPlayer.position && !p.onIr)
         .toList();
+    final max = _positionMax[irPlayer.position] ?? 99;
+    final needsDrop = activeAtPos.length >= max;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => _ActivateSheet(
         irPlayer: irPlayer,
-        candidates: candidates,
+        candidates: needsDrop ? activeAtPos : [],
+        needsDrop: needsDrop,
         leagueId: widget.leagueId,
         teamId: widget.teamId,
         onActivated: () { Navigator.pop(context); _load(); },
@@ -597,6 +605,7 @@ class _PlayerDetailSheetState extends State<_PlayerDetailSheet> {
 class _ActivateSheet extends StatefulWidget {
   final _Player irPlayer;
   final List<_Player> candidates;
+  final bool needsDrop;
   final String leagueId;
   final String teamId;
   final VoidCallback onActivated;
@@ -604,6 +613,7 @@ class _ActivateSheet extends StatefulWidget {
   const _ActivateSheet({
     required this.irPlayer,
     required this.candidates,
+    required this.needsDrop,
     required this.leagueId,
     required this.teamId,
     required this.onActivated,
@@ -619,17 +629,16 @@ class _ActivateSheetState extends State<_ActivateSheet> {
   String? _error;
 
   Future<void> _confirm() async {
-    if (_selected == null) return;
+    if (widget.needsDrop && _selected == null) return;
     setState(() { _loading = true; _error = null; });
     try {
       final auth = context.read<AuthProvider>();
+      final body = <String, dynamic>{'activate_player_id': widget.irPlayer.id};
+      if (_selected != null) body['drop_player_id'] = _selected!.id;
       final res = await http.post(
         Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.teamId}/activate'),
         headers: {...auth.authHeaders, 'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'drop_player_id':     _selected!.id,
-          'activate_player_id': widget.irPlayer.id,
-        }),
+        body: jsonEncode(body),
       );
       if (res.statusCode == 204) {
         widget.onActivated();
@@ -660,13 +669,13 @@ class _ActivateSheetState extends State<_ActivateSheet> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               Text(
-                'Drop a ${widget.irPlayer.position} from active roster:',
+                widget.needsDrop
+                    ? 'Position is full — drop a ${widget.irPlayer.position} to make room:'
+                    : 'You have an open ${widget.irPlayer.position} slot.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
-              if (widget.candidates.isEmpty)
-                const Text('No active players at this position to drop.')
-              else
+              if (widget.needsDrop)
                 Expanded(
                   child: ListView(
                     controller: scroll,
@@ -700,10 +709,10 @@ class _ActivateSheetState extends State<_ActivateSheet> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: (_selected != null && !_loading) ? _confirm : null,
+                  onPressed: ((!widget.needsDrop || _selected != null) && !_loading) ? _confirm : null,
                   child: _loading
                       ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Drop & Activate'),
+                      : Text(widget.needsDrop ? 'Drop & Activate' : 'Activate'),
                 ),
               ),
             ],

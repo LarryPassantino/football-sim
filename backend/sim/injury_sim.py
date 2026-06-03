@@ -118,25 +118,29 @@ def build_game_day_sim_team(draft_team):
     sim_roster = {}
 
     for pos, slots in SIM_SLOTS.items():
-        n_start    = slots['starters']
-        has_backup = slots['backups'] > 0
-        players    = roster.get(pos, [])
+        n_start  = slots['starters']
+        n_backup = slots['backups']
+        players  = roster.get(pos, [])
 
-        healthy = [p for p in players[:n_start]
-                   if p.get('injury_games_remaining', 0) == 0]
-        backup  = players[n_start] if has_backup and len(players) > n_start else None
-        injured = n_start - len(healthy)
+        healthy_starters = [p for p in players[:n_start]
+                            if p.get('injury_games_remaining', 0) == 0]
+        bench = [p for p in players[n_start:n_start + n_backup]
+                 if p.get('injury_games_remaining', 0) == 0]
 
-        game_starters = list(healthy)
-        game_backup   = backup
+        injured = n_start - len(healthy_starters)
+        game_starters = list(healthy_starters)
+        promoted = 0
+        for i in range(injured):
+            if promoted < len(bench):
+                game_starters.append(bench[promoted])
+                promoted += 1
 
-        if injured > 0 and backup is not None:
-            game_starters.append(backup)
-            game_backup = None
+        # Remaining bench player used for group_composite backup weighting
+        game_backup = bench[promoted] if promoted < len(bench) else None
 
         # Absolute fallback: can't have an empty starters list (causes div/0)
         if not game_starters:
-            game_starters = list(players[:n_start]) or ([backup] if backup else [])
+            game_starters = list(players[:n_start]) or (bench[:1] if bench else [])
 
         sim_roster[pos] = {'starters': game_starters, 'backup': game_backup}
 

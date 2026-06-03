@@ -7,9 +7,9 @@ from ..auth import (
     create_access_token, create_refresh_token,
     decode_token, hash_password, verify_password,
 )
-from ..dependencies import get_db
+from ..dependencies import get_current_coach, get_db
 from ..models import Coach
-from ..schemas import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
+from ..schemas import FcmTokenRequest, LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 
@@ -72,3 +72,13 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
     return TokenResponse(access_token=access, refresh_token=refresh)
+
+
+@router.post('/fcm-token', status_code=204)
+async def register_fcm_token(
+    body: FcmTokenRequest,
+    coach: Coach = Depends(get_current_coach),
+    db: AsyncSession = Depends(get_db),
+):
+    coach.fcm_token = body.token
+    await db.commit()

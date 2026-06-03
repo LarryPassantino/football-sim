@@ -51,6 +51,7 @@ class Coach(Base):
     hashed_password:    Mapped[str]           = mapped_column(String(255), nullable=False)
     display_name:       Mapped[str]           = mapped_column(String(100), nullable=False)
     refresh_token_hash: Mapped[str | None]    = mapped_column(String(255), nullable=True)
+    fcm_token:          Mapped[str | None]    = mapped_column(String(255), nullable=True)
     created_at:         Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=_now)
 
 

@@ -8,7 +8,7 @@ from collections import defaultdict
 TEAM_COUNT    = 16
 FA_BUFFER_PCT = 0.15   # fraction above roster needs that goes to FA pool
 
-POOL_TALENT_MEAN = 70.0
+POOL_TALENT_MEAN = 72.0
 POOL_TALENT_STD  = 11.0
 
 # Stat variance by priority rank — SKILL stat is tightest to base talent
@@ -62,8 +62,8 @@ WEIGHTS_6 = [0.30, 0.22, 0.18, 0.14, 0.10, 0.06]
 WEIGHTS_3 = [0.50, 0.30, 0.20]
 
 ROSTER_SLOTS = {
-    'QB': 2,  'WR': 4,  'TE': 2,  'RB': 2,  'OL': 6,
-    'DT': 3,  'DE': 3,  'LB': 4,  'CB': 3,  'S':  3,
+    'QB': 2,  'WR': 5,  'TE': 2,  'RB': 3,  'OL': 6,
+    'DT': 4,  'DE': 4,  'LB': 5,  'CB': 4,  'S':  4,
     'K':  1,  'P':  1,
 }
 

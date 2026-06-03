@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "823619151423",
+    "project_id": "gridiron-empire",
+    "storage_bucket": "gridiron-empire.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:823619151423:android:8a89c558552a42fc34ba8a",
+        "android_client_info": {
+          "package_name": "app.emptycrowds.gridironempire"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDz30Tu9HeIA1QMcXovTy_ZXl1cPccJncI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

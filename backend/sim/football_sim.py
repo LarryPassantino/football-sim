@@ -117,15 +117,15 @@ WEIGHTS_3 = [0.50, 0.30, 0.20]                      # K, P
 # Roster slots per position group
 ROSTER_SLOTS = {
     'QB': {'starters': 1, 'backups': 1},
-    'WR': {'starters': 3, 'backups': 1},
+    'WR': {'starters': 3, 'backups': 2},
     'TE': {'starters': 1, 'backups': 1},
-    'RB': {'starters': 1, 'backups': 1},
+    'RB': {'starters': 1, 'backups': 2},
     'OL': {'starters': 5, 'backups': 1},
-    'DT': {'starters': 2, 'backups': 1},
-    'DE': {'starters': 2, 'backups': 1},
-    'LB': {'starters': 3, 'backups': 1},
-    'CB': {'starters': 2, 'backups': 1},
-    'S':  {'starters': 2, 'backups': 1},
+    'DT': {'starters': 2, 'backups': 2},
+    'DE': {'starters': 2, 'backups': 2},
+    'LB': {'starters': 3, 'backups': 2},
+    'CB': {'starters': 2, 'backups': 2},
+    'S':  {'starters': 2, 'backups': 2},
     'K':  {'starters': 1, 'backups': 0},
     'P':  {'starters': 1, 'backups': 0},
 }

@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"gridiron-empire","appId":"1:823619151423:android:8a89c558552a42fc34ba8a","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"gridiron-empire","configurations":{"android":"1:823619151423:android:8a89c558552a42fc34ba8a","ios":"1:823619151423:ios:8740ef5ff80285b634ba8a"}}}}}}

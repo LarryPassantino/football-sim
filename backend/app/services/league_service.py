@@ -13,10 +13,11 @@ from sim.player_gen import generate_pool
 from sim.season_sim import build_schedule
 
 from ..models import (
-    Game, GameStatus, League, LeagueStatus,
+    Coach, Game, GameStatus, League, LeagueStatus,
     Player, PlayerGameStats, Season, SeasonStatus, Team,
 )
 from .sim_bridge import clear_all_injuries, play_game
+from .push_service import send_game_result
 
 REGULAR_SEASON_WEEKS = 17
 OFFSEASON_DAYS       = 4
@@ -314,6 +315,19 @@ async def advance_week(db: AsyncSession, league_id: uuid.UUID) -> dict:
     return await _advance_playoff_week(db, season)
 
 
+async def _notify_game_result(db: AsyncSession, game: Game) -> None:
+    """Send push notification to any human coach involved in this game."""
+    for team, my_score, opp_score, opponent in [
+        (game.home_team, game.home_score, game.away_score, game.away_team.name),
+        (game.away_team, game.away_score, game.home_score, game.home_team.name),
+    ]:
+        if not team.coach_id:
+            continue
+        coach = await db.get(Coach, team.coach_id)
+        if coach and coach.fcm_token:
+            send_game_result(coach.fcm_token, team.name, my_score, opp_score, opponent)
+
+
 async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
     result = await db.execute(
         select(Game)
@@ -337,6 +351,7 @@ async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
         game.home_team.def_gameplan = 'balanced'
         game.away_team.off_gameplan = 'balanced'
         game.away_team.def_gameplan = 'balanced'
+        await _notify_game_result(db, game)
 
     await run_cpu_roster_moves(db, season)
 
@@ -395,6 +410,7 @@ async def _advance_playoff_week(db: AsyncSession, season: Season) -> dict:
         game.home_team.def_gameplan = 'balanced'
         game.away_team.off_gameplan = 'balanced'
         game.away_team.def_gameplan = 'balanced'
+        await _notify_game_result(db, game)
 
     await run_cpu_roster_moves(db, season)
 

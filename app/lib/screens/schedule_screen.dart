@@ -104,20 +104,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Widget _buildSchedule() {
-    // Group by week
     final Map<int, List<_Game>> byWeek = {};
     for (final g in _games!) {
       byWeek.putIfAbsent(g.week, () => []).add(g);
     }
 
-    return ListView(
+    // SingleChildScrollView + Column so all widgets are built eagerly — required
+    // for Scrollable.ensureVisible(_targetKey) to resolve a non-null context.
+    return SingleChildScrollView(
       padding: EdgeInsets.only(top: 8, bottom: 8 + MediaQuery.of(context).padding.bottom),
-      children: [
-        for (final week in byWeek.keys.toList()..sort()) ...[
-          _weekHeader(week),
-          for (final game in byWeek[week]!) _gameRow(game),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final week in byWeek.keys.toList()..sort()) ...[
+            _weekHeader(week),
+            for (final game in byWeek[week]!) _gameRow(game),
+          ],
         ],
-      ],
+      ),
     );
   }
 

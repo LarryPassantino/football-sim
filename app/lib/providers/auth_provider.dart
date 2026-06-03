@@ -101,6 +101,17 @@ class AuthProvider extends ChangeNotifier {
     await prefs.setString('refresh_token', _refreshToken!);
   }
 
+  Future<void> registerFcmToken(String token) async {
+    if (_accessToken == null) return;
+    try {
+      await http.post(
+        Uri.parse('$kBaseUrl/auth/fcm-token'),
+        headers: authHeaders,
+        body: jsonEncode({'token': token}),
+      );
+    } catch (_) {}
+  }
+
   Future<void> login(String email, String password) async {
     final res = await http.post(
       Uri.parse('$kBaseUrl/auth/login'),

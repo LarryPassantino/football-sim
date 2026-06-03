@@ -6,7 +6,7 @@
 - [ ] Draft system — annual draft class; no roster limit immediately post-draft, but rosters must be trimmed to active limit before season start
 
 ## Gameplay
-- [ ] League leaders — split Defense into sub-sections (Tackles / Sacks / Interceptions) instead of single tackles-sorted list
+- [x] League leaders — split Defense into sub-sections (Tackles / Sacks / Interceptions) instead of single tackles-sorted list
 - [ ] Trade — "Offer for Trade" from own roster (stub exists in player detail sheet on RosterScreen)
 - [ ] Trade — n-for-n trades (post-v1)
 - [ ] Team history view — season-by-season W/L record tied to team_id, survives name changes
