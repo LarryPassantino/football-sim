@@ -42,13 +42,14 @@ class LeagueResponse(BaseModel):
 
 
 class LeagueDetailResponse(BaseModel):
-    id:                       uuid.UUID
-    name:                     str
-    status:                   str
-    current_week:             int | None
-    season_status:            str | None
-    created_at:               datetime
-    offseason_days_remaining: int | None = None
+    id:                        uuid.UUID
+    name:                      str
+    status:                    str
+    current_week:              int | None
+    season_status:             str | None
+    created_at:                datetime
+    offseason_days_remaining:  int | None = None
+    preseason_days_remaining:  int | None = None
 
 
 class TeamResponse(BaseModel):
@@ -313,3 +314,40 @@ class CoachTeamItem(BaseModel):
     league_name: str
     conference: str
     division:   str
+
+
+class DraftPickRequest(BaseModel):
+    player_id: uuid.UUID
+
+
+class DraftPlayerItem(BaseModel):
+    id:        str
+    name:      str
+    position:  str
+    age:       int
+    composite: str
+    stats:     dict[str, str]
+
+
+class DraftPickRecord(BaseModel):
+    pick:            int
+    round:           int
+    team_id:         str
+    team_name:       str = ''
+    player_name:     str
+    position:        str
+    composite_label: str
+
+
+class DraftStateResponse(BaseModel):
+    is_done:           bool
+    current_pick:      int
+    total_picks:       int
+    current_round:     int | None
+    rounds:            int
+    is_human_turn:     bool
+    current_team_id:   str | None
+    current_team_name: str
+    available:         list[DraftPlayerItem]
+    recent_picks:      list[DraftPickRecord]
+    draft_complete:    bool = False

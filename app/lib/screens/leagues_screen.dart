@@ -8,6 +8,7 @@ import 'game_detail_screen.dart';
 import 'league_leaders_screen.dart';
 import 'matchup_screen.dart';
 import 'roster_screen.dart';
+import 'draft_screen.dart';
 import 'schedule_screen.dart';
 import 'scout_screen.dart';
 import 'standings_screen.dart';
@@ -17,12 +18,14 @@ class _LeagueDetail {
   final int? currentWeek;
   final String? seasonStatus;
   final int? offseasonDaysRemaining;
+  final int? preseasonDaysRemaining;
 
   _LeagueDetail.fromJson(Map<String, dynamic> j)
       : name = j['name'],
         currentWeek = j['current_week'],
         seasonStatus = j['season_status'],
-        offseasonDaysRemaining = j['offseason_days_remaining'];
+        offseasonDaysRemaining = j['offseason_days_remaining'],
+        preseasonDaysRemaining = j['preseason_days_remaining'];
 }
 
 class _MyRecord {
@@ -90,6 +93,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
   _GameSummary? _nextGame;
   String? _headline;
   List<_IrPlayer> _irPlayers = [];
+  List<Map<String, dynamic>> _myDraftPicks = [];
   bool _loading = true;
   String? _error;
 
@@ -106,12 +110,13 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     final teamId   = auth.teamId!;
 
     try {
-      // Fetch league detail, standings, roster, and news in parallel
+      // Fetch league detail, standings, roster, news, and draft results in parallel
       final responses = await Future.wait([
         http.get(Uri.parse('$kBaseUrl/leagues/$leagueId'), headers: auth.authHeaders),
         http.get(Uri.parse('$kBaseUrl/leagues/$leagueId/standings'), headers: auth.authHeaders),
         http.get(Uri.parse('$kBaseUrl/leagues/$leagueId/teams/$teamId/roster'), headers: auth.authHeaders),
         http.get(Uri.parse('$kBaseUrl/leagues/$leagueId/teams/$teamId/news'), headers: auth.authHeaders),
+        http.get(Uri.parse('$kBaseUrl/leagues/$leagueId/draft/results'), headers: auth.authHeaders),
       ]);
 
       if (responses[0].statusCode != 200) throw Exception('Failed to load league');
@@ -170,9 +175,9 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             isPlayoff:     game['is_playoff'] as bool? ?? false,
           );
           if (isPlayed) {
-            lastGame = gs;         // keep updating; last played wins
-          } else if (nextGame == null) {
-            nextGame = gs;         // first unplayed wins
+            lastGame = gs;
+          } else {
+            nextGame ??= gs;
           }
         }
       }
@@ -192,14 +197,23 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         });
       }
 
+      List<Map<String, dynamic>> myDraftPicks = [];
+      if (responses[4].statusCode == 200) {
+        final draftData = jsonDecode(responses[4].body) as Map<String, dynamic>;
+        myDraftPicks = (draftData['my_picks'] as List)
+            .map((p) => p as Map<String, dynamic>)
+            .toList();
+      }
+
       setState(() {
-        _league    = league;
-        _record    = record;
-        _lastGame  = lastGame;
-        _nextGame  = nextGame;
-        _headline  = headline;
-        _irPlayers = irPlayers;
-        _loading   = false;
+        _league        = league;
+        _record        = record;
+        _lastGame      = lastGame;
+        _nextGame      = nextGame;
+        _headline      = headline;
+        _irPlayers     = irPlayers;
+        _myDraftPicks  = myDraftPicks;
+        _loading       = false;
       });
     } catch (e) {
       setState(() {
@@ -267,9 +281,11 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
     }
   }
 
@@ -290,6 +306,10 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         ],
         if (_nextGame != null) _buildNextGameCard(_nextGame!),
         _buildAlertsSection(auth),
+        if (_myDraftPicks.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildDraftPicksCard(),
+        ],
         const SizedBox(height: 24),
         FilledButton.icon(
           icon: const Icon(Icons.people),
@@ -345,6 +365,17 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             ),
           ),
         ),
+        if (_league?.seasonStatus == 'offseason' || _league?.seasonStatus == 'preseason') ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            icon: const Icon(Icons.how_to_vote),
+            label: const Text('Draft Board'),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => DraftScreen(leagueId: leagueId, myTeamId: auth.teamId!)),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         OutlinedButton.icon(
           icon: const Icon(Icons.person_search),
@@ -387,6 +418,19 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         icon: Icons.sports_football,
         color: Theme.of(context).colorScheme.primary,
         title: 'Offseason',
+        subtitle: subtitle,
+      ));
+    } else if (status == 'preseason') {
+      final days = _league?.preseasonDaysRemaining;
+      final subtitle = days == null || days <= 0
+          ? 'Season starting soon'
+          : days == 1
+              ? 'Season starts tomorrow'
+              : 'Season starts in $days days';
+      alerts.add(_alertTile(
+        icon: Icons.how_to_vote,
+        color: Theme.of(context).colorScheme.primary,
+        title: 'Preseason — roster finalization',
         subtitle: subtitle,
       ));
     } else if (status == 'complete') {
@@ -654,6 +698,54 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     );
   }
 
+
+  Widget _buildDraftPicksCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'DRAFT PICKS',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ..._myDraftPicks.map((p) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(children: [
+                SizedBox(
+                  width: 64,
+                  child: Text(
+                    'Rd ${p['round']}  #${p['pick']}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${p['position']}  ',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                Expanded(
+                  child: Text(p['player_name'] as String, style: const TextStyle(fontSize: 13)),
+                ),
+                Text(
+                  p['composite_label'] as String,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+              ]),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
 
   String _weekLabel(int week) {
     if (week <= 17) return 'Week $week';

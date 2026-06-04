@@ -39,6 +39,18 @@ def assign_label(value):
     return 'Weak' if value < 50 else 'Elite'
 
 
+DRAFT_LABEL_MAP = {
+    'Elite':     'Top Prospect',
+    'Above Avg': 'Strong Prospect',
+    'Average':   'Solid Contributor',
+    'Below Avg': 'Depth Piece',
+    'Weak':      'Developmental',
+}
+
+def assign_draft_label(value):
+    return DRAFT_LABEL_MAP[assign_label(value)]
+
+
 # ============================================================
 # POSITION DEFINITIONS
 # ============================================================

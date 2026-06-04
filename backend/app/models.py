@@ -12,10 +12,12 @@ class Base(DeclarativeBase):
 
 
 class LeagueStatus(str, enum.Enum):
-    setup     = 'setup'
-    regular   = 'regular'
-    playoffs  = 'playoffs'
-    offseason = 'offseason'
+    setup      = 'setup'
+    regular    = 'regular'
+    playoffs   = 'playoffs'
+    offseason  = 'offseason'
+    drafting   = 'drafting'   # reserved for future live draft
+    preseason  = 'preseason'
 
 
 class SeasonStatus(str, enum.Enum):
@@ -67,6 +69,7 @@ class Team(Base):
     coach_id:     Mapped[uuid.UUID|None] = mapped_column(UUID(as_uuid=True), ForeignKey('coaches.id'), nullable=True)
     off_gameplan: Mapped[str]            = mapped_column(String(20), default='balanced', server_default='balanced')
     def_gameplan: Mapped[str]            = mapped_column(String(20), default='balanced', server_default='balanced')
+    draft_board:  Mapped[dict | None]    = mapped_column(JSONB, nullable=True)
 
 
 class Player(Base):
@@ -83,19 +86,21 @@ class Player(Base):
     potential:               Mapped[float]          = mapped_column(Float, nullable=False)
     injury_games_remaining:  Mapped[int]            = mapped_column(Integer, default=0)
     on_ir:                   Mapped[bool]           = mapped_column(Boolean, default=False, server_default='false')
+    is_draft_eligible:       Mapped[bool]           = mapped_column(Boolean, default=False, server_default='false')
     career_stats:            Mapped[dict]           = mapped_column(JSONB, default=dict, server_default='{}')
 
 
 class Season(Base):
     __tablename__ = 'seasons'
 
-    id:             Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    league_id:      Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), ForeignKey('leagues.id'), nullable=False)
-    season_number:  Mapped[int]            = mapped_column(Integer, nullable=False)
-    status:         Mapped[SeasonStatus]   = mapped_column(default=SeasonStatus.regular)
-    current_week:   Mapped[int]            = mapped_column(Integer, default=1)
-    created_at:     Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=_now)
+    id:             Mapped[uuid.UUID]       = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    league_id:      Mapped[uuid.UUID]       = mapped_column(UUID(as_uuid=True), ForeignKey('leagues.id'), nullable=False)
+    season_number:  Mapped[int]             = mapped_column(Integer, nullable=False)
+    status:         Mapped[SeasonStatus]    = mapped_column(default=SeasonStatus.regular)
+    current_week:   Mapped[int]             = mapped_column(Integer, default=1)
+    created_at:     Mapped[datetime]        = mapped_column(DateTime(timezone=True), default=_now)
     completed_at:   Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    draft_state:    Mapped[dict | None]     = mapped_column(JSONB, nullable=True)
 
 
 class Game(Base):

@@ -8,8 +8,8 @@ from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from sim.draft_sim import LEAGUE as LEAGUE_STRUCTURE, build_teams, run_draft
-from sim.player_gen import generate_pool
+from sim.draft_sim import LEAGUE as LEAGUE_STRUCTURE, PICK_PRIORITY, build_teams, run_draft
+from sim.player_gen import generate_player, generate_pool, ROSTER_SLOTS
 from sim.season_sim import build_schedule
 
 from ..models import (
@@ -503,6 +503,9 @@ async def end_season(db: AsyncSession, league_id: uuid.UUID) -> None:
     league.status = LeagueStatus.offseason
     await db.commit()
 
+    # Generate draft class immediately so coaches have the full offseason to scout
+    await generate_annual_draft_class(db, league_id)
+
 
 async def start_new_season(db: AsyncSession, league_id: uuid.UUID) -> None:
     """Create season N+1 with a fresh schedule. Players keep their current rosters."""
@@ -547,3 +550,305 @@ async def start_new_season(db: AsyncSession, league_id: uuid.UUID) -> None:
 
     league.status = LeagueStatus.regular
     await db.commit()
+
+
+# ============================================================
+# ANNUAL DRAFT
+# ============================================================
+
+DRAFT_ROUNDS     = 5
+DRAFT_CLASS_SIZE = 100
+DRAFT_CLASS_AGES = [21, 21, 22, 22, 22, 23, 23, 23]
+DRAFT_TOLERANCE  = 5.0   # composite points; within this, follow position priority
+PRESEASON_DAYS   = 2
+
+FA_MAX_PER_POSITION = {
+    'K': 6,  'P': 6,
+    'TE': 8, 'RB': 8,
+    'QB': 10, 'DT': 10, 'DE': 10, 'CB': 10, 'S': 10,
+    'WR': 12, 'OL': 12, 'LB': 12,
+}
+
+
+async def _draft_order_from_standings(db: AsyncSession, league_id: uuid.UUID) -> list[uuid.UUID]:
+    """Return team IDs worst→best from the most recently completed season."""
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id, Season.status == SeasonStatus.complete)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    last = result.scalar_one_or_none()
+    if not last:
+        result = await db.execute(select(Team).where(Team.league_id == league_id).order_by(Team.id))
+        return [t.id for t in result.scalars().all()]
+
+    standings = await _get_standings(db, last)
+    ranked = _sort_standings(standings)
+    ranked.reverse()  # _sort_standings is best→worst; flip for draft (worst picks first)
+    return [r['team_id'] for r in ranked]
+
+
+async def generate_annual_draft_class(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """
+    Generate the draft class for the upcoming draft. Called immediately when a
+    season ends so coaches have the full offseason window to scout and set boards.
+    League stays in 'offseason' status — the cron advances to the actual draft run.
+    """
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    last_season = result.scalar_one()
+
+    order     = await _draft_order_from_standings(db, league_id)
+    order_str = [str(tid) for tid in order]
+
+    positions = list(ROSTER_SLOTS.keys())
+    weights   = [ROSTER_SLOTS[p] for p in positions]
+    for _ in range(DRAFT_CLASS_SIZE):
+        pos = random.choices(positions, weights=weights)[0]
+        age = random.choice(DRAFT_CLASS_AGES)
+        p   = generate_player(pos, age=age)
+        db.add(Player(
+            league_id=league_id,
+            team_id=None,
+            name=p['name'],
+            position=p['position'],
+            age=p['age'],
+            stats=p['stats'],
+            composite=p['composite'],
+            potential=p['potential'],
+            is_draft_eligible=True,
+        ))
+
+    last_season.draft_state = {
+        'rounds':      DRAFT_ROUNDS,
+        'total_picks': DRAFT_ROUNDS * len(order),
+        'order':       order_str,
+        'picks':       [],
+    }
+    await db.commit()
+
+
+def _cpu_draft_pick(available: list, roster_counts: dict[str, int]) -> 'Player | None':
+    """Pick best available for a CPU team using urgency scoring."""
+    def urgency(pos: str) -> float:
+        deficit = max(0, ROSTER_SLOTS[pos] - roster_counts.get(pos, 0))
+        if deficit <= 0:
+            return -1.0
+        return PICK_PRIORITY.get(pos, 1) * (deficit / ROSTER_SLOTS[pos])
+
+    by_pos: dict[str, list] = defaultdict(list)
+    for p in available:
+        by_pos[p.position].append(p)
+
+    best_pos = max(
+        (pos for pos in by_pos if by_pos[pos]),
+        key=urgency,
+        default=None,
+    )
+    if best_pos is None:
+        return None
+    return max(by_pos[best_pos], key=lambda p: p.composite)
+
+
+def _board_draft_pick(
+    available: list,
+    position_priority: list[str | None],
+    positions_filled: set[str],
+) -> tuple['Player | None', str | None]:
+    """
+    Pick using the coach's draft board.
+
+    Walks the priority list (skipping already-filled positions) and picks the
+    best available at the first position within DRAFT_TOLERANCE of the overall
+    best player. Falls back to overall best if no priority position qualifies.
+
+    Returns (player, priority_position_used_or_None).
+    """
+    if not available:
+        return None, None
+
+    best_overall = max(available, key=lambda p: p.composite)
+
+    by_pos: dict[str, list] = defaultdict(list)
+    for p in available:
+        by_pos[p.position].append(p)
+
+    active_priority = [pos for pos in position_priority if pos and pos not in positions_filled]
+
+    for pos in active_priority:
+        candidates = by_pos.get(pos, [])
+        if not candidates:
+            continue
+        best_at_pos = max(candidates, key=lambda p: p.composite)
+        if best_overall.composite - best_at_pos.composite <= DRAFT_TOLERANCE:
+            return best_at_pos, pos
+
+    return best_overall, None  # no priority position within tolerance
+
+
+async def run_full_draft(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """
+    Execute all draft picks for a league using each team's board (human teams)
+    or urgency algorithm (CPU teams). Called by the cron after the offseason window.
+    Stores the full pick log in season.draft_state and moves the league to preseason.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+    from sim.player_gen import assign_draft_label
+
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    season = result.scalar_one()
+    state  = dict(season.draft_state)
+    order  = [uuid.UUID(tid) for tid in state['order']]
+    n      = len(order)
+
+    result = await db.execute(select(Team).where(Team.league_id == league_id))
+    teams  = {t.id: t for t in result.scalars().all()}
+    team_names = {t.id: t.name for t in teams.values()}
+
+    # Per-team tracking
+    roster_counts:     dict[uuid.UUID, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    positions_filled:  dict[uuid.UUID, set[str]]       = defaultdict(set)
+
+    # Pre-load existing roster counts
+    result = await db.execute(
+        select(Player).where(Player.league_id == league_id, Player.team_id != None)
+    )
+    for p in result.scalars().all():
+        roster_counts[p.team_id][p.position] += 1
+
+    picks = []
+    for pick_num in range(state['total_picks']):
+        team_id   = order[pick_num % n]
+        round_num = pick_num // n + 1
+
+        # Load remaining draft class
+        result = await db.execute(
+            select(Player).where(
+                Player.league_id == league_id,
+                Player.is_draft_eligible == True,
+            )
+        )
+        available = list(result.scalars().all())
+        if not available:
+            break
+
+        team = teams[team_id]
+        if team.coach_id is not None:
+            # Human team — use draft board
+            board    = team.draft_board or {}
+            priority = board.get('position_priority', [])
+            player, pos_used = _board_draft_pick(available, priority, positions_filled[team_id])
+            if pos_used:
+                positions_filled[team_id].add(pos_used)
+        else:
+            # CPU team — urgency algorithm
+            player = _cpu_draft_pick(available, roster_counts[team_id])
+
+        if player is None:
+            break
+
+        player.team_id           = team_id
+        player.is_draft_eligible = False
+        roster_counts[team_id][player.position] += 1
+
+        picks.append({
+            'pick':            pick_num + 1,
+            'round':           round_num,
+            'team_id':         str(team_id),
+            'team_name':       team_names[team_id],
+            'player_id':       str(player.id),
+            'player_name':     player.name,
+            'position':        player.position,
+            'age':             player.age,
+            'composite_label': assign_draft_label(player.composite),
+        })
+
+    state['picks'] = picks
+    season.draft_state = state
+    flag_modified(season, 'draft_state')
+    await db.commit()
+
+    await _finalize_draft(db, league_id)
+
+
+async def _finalize_draft(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """Clear draft eligibility, cull FA pool, move league to preseason."""
+    result = await db.execute(
+        select(Player).where(Player.league_id == league_id, Player.is_draft_eligible == True)
+    )
+    for p in result.scalars().all():
+        p.is_draft_eligible = False
+
+    for pos, cap in FA_MAX_PER_POSITION.items():
+        result = await db.execute(
+            select(Player)
+            .where(Player.league_id == league_id, Player.team_id == None, Player.position == pos)
+            .order_by(Player.composite.desc())
+        )
+        for excess in result.scalars().all()[cap:]:
+            await db.delete(excess)
+
+    result = await db.execute(select(League).where(League.id == league_id))
+    league = result.scalar_one()
+    league.status = LeagueStatus.preseason
+    await db.commit()
+
+
+async def start_preseason(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """Alias — league is already in preseason after draft finalization."""
+    pass
+
+
+async def end_preseason(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """After the preseason window, start the regular season."""
+    await start_new_season(db, league_id)
+
+
+async def get_draft_class(db: AsyncSession, league_id: uuid.UUID) -> list[dict]:
+    """Return all draft-eligible players in scout (draft-label) view."""
+    from sim.player_gen import assign_draft_label, POSITION_STATS
+
+    result = await db.execute(
+        select(Player)
+        .where(Player.league_id == league_id, Player.is_draft_eligible == True)
+        .order_by(Player.position, Player.composite.desc())
+    )
+    out = []
+    for p in result.scalars().all():
+        stat_names = POSITION_STATS[p.position]
+        out.append({
+            'id':        str(p.id),
+            'name':      p.name,
+            'position':  p.position,
+            'age':       p.age,
+            'composite': assign_draft_label(p.composite),
+            'stats':     {n: assign_draft_label(v) for n, v in zip(stat_names, p.stats)},
+        })
+    return out
+
+
+async def get_draft_results(db: AsyncSession, league_id: uuid.UUID, my_team_id: uuid.UUID) -> dict:
+    """Return the full pick log for the most recent draft."""
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    season = result.scalar_one_or_none()
+    if not season or not season.draft_state:
+        return {'picks': [], 'my_picks': []}
+
+    picks    = season.draft_state.get('picks', [])
+    my_picks = [p for p in picks if p.get('team_id') == str(my_team_id)]
+    return {'picks': picks, 'my_picks': my_picks, 'rounds': season.draft_state.get('rounds', DRAFT_ROUNDS)}

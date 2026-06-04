@@ -12,17 +12,18 @@ from sim.player_gen import POSITION_STATS, assign_label
 from sqlalchemy import func
 from ..models import Coach, Game, GameStatus, League, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team
 from ..schemas import (
-    ActivateRequest, AvailableLeaguesResponse, DefenseLeader, GameDetailResponse,
-    GameMatchupResponse, GamePlanRequest, GameResponse, GroupComposite, LeagueAvailableItem,
-    LeagueCreateRequest, LeagueDetailResponse, LeagueLeadersResponse, LeagueResponse, PassingLeader,
-    PlayerRosterItem, PlayerScoutItem, PlayerStatLine, PlayerStatsResponse, ReceivingLeader,
-    ReleaseRequest, ReleaseResponse, RushingLeader, SignFARequest, StandingRow, StandingsResponse,
-    TeamMatchupSide, TeamNewsResponse, TeamPickerItem, TeamRenameRequest, TeamResponse,
-    TradeRequest, TradeResponse,
+    ActivateRequest, AvailableLeaguesResponse, DefenseLeader,
+    GameDetailResponse, GameMatchupResponse, GamePlanRequest, GameResponse, GroupComposite,
+    LeagueAvailableItem, LeagueCreateRequest, LeagueDetailResponse, LeagueLeadersResponse,
+    LeagueResponse, PassingLeader, PlayerRosterItem, PlayerScoutItem, PlayerStatLine,
+    PlayerStatsResponse, ReceivingLeader, ReleaseRequest, ReleaseResponse, RushingLeader,
+    SignFARequest, StandingRow, StandingsResponse, TeamMatchupSide, TeamNewsResponse,
+    TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
 )
 from ..services.league_service import (
-    create_league, OFFSEASON_DAYS,
+    create_league, OFFSEASON_DAYS, PRESEASON_DAYS,
     PLAYOFF_DIVISIONAL, PLAYOFF_CONF_CHAMP, PLAYOFF_LEAGUE_CHAMP,
+    get_draft_class, get_draft_results,
 )
 
 router = APIRouter(prefix='/leagues', tags=['leagues'])
@@ -108,9 +109,16 @@ async def get_league(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         elapsed = (datetime.now(timezone.utc) - latest_season.completed_at).days
         offseason_days_remaining = max(0, OFFSEASON_DAYS - elapsed)
 
+    preseason_days_remaining = None
+    if league.status == LeagueStatus.preseason and latest_season and latest_season.completed_at:
+        elapsed = (datetime.now(timezone.utc) - latest_season.completed_at).days
+        preseason_days_remaining = max(0, OFFSEASON_DAYS + PRESEASON_DAYS - elapsed)
+
     season_status = None
     if league.status == LeagueStatus.offseason:
         season_status = 'offseason'
+    elif league.status == LeagueStatus.preseason:
+        season_status = 'preseason'
     elif active_season:
         season_status = active_season.status.value
 
@@ -122,6 +130,7 @@ async def get_league(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         season_status=season_status,
         created_at=league.created_at,
         offseason_days_remaining=offseason_days_remaining,
+        preseason_days_remaining=preseason_days_remaining,
     )
 
 
@@ -1078,3 +1087,97 @@ async def get_league_leaders(league_id: uuid.UUID, db: AsyncSession = Depends(ge
         def_sacks=def_sacks,
         def_interceptions=def_ints,
     )
+
+
+# ============================================================
+# DRAFT ENDPOINTS
+# ============================================================
+
+def _require_team_in_league(team):
+    if not team:
+        raise HTTPException(status_code=403, detail='Not in this league')
+
+
+@router.get('/{league_id}/draft/class')
+async def get_draft_class_endpoint(
+    league_id: uuid.UUID,
+    coach:     Coach = Depends(get_current_coach),
+    db:        AsyncSession = Depends(get_db),
+):
+    """Scout the current draft class (available during offseason and preseason)."""
+    result = await db.execute(
+        select(Team).where(Team.league_id == league_id, Team.coach_id == coach.id)
+    )
+    _require_team_in_league(result.scalar_one_or_none())
+    return await get_draft_class(db, league_id)
+
+
+@router.get('/{league_id}/draft/results')
+async def get_draft_results_endpoint(
+    league_id: uuid.UUID,
+    coach:     Coach = Depends(get_current_coach),
+    db:        AsyncSession = Depends(get_db),
+):
+    """Full pick log for the most recent draft."""
+    result = await db.execute(
+        select(Team).where(Team.league_id == league_id, Team.coach_id == coach.id)
+    )
+    team = result.scalar_one_or_none()
+    _require_team_in_league(team)
+    return await get_draft_results(db, league_id, team.id)
+
+
+@router.get('/{league_id}/draft/board')
+async def get_draft_board(
+    league_id: uuid.UUID,
+    coach:     Coach = Depends(get_current_coach),
+    db:        AsyncSession = Depends(get_db),
+):
+    """Return this coach's draft board for the league."""
+    result = await db.execute(
+        select(Team).where(Team.league_id == league_id, Team.coach_id == coach.id)
+    )
+    team = result.scalar_one_or_none()
+    _require_team_in_league(team)
+    board = team.draft_board or {'position_priority': [None, None, None, None, None]}
+    return board
+
+
+@router.put('/{league_id}/draft/board')
+async def set_draft_board(
+    league_id: uuid.UUID,
+    body:      dict,
+    coach:     Coach = Depends(get_current_coach),
+    db:        AsyncSession = Depends(get_db),
+):
+    """
+    Set this coach's draft board. Body: {"position_priority": ["QB", "WR", null, null, null]}
+    Exactly 5 slots; each is a position string or null.
+    """
+    result = await db.execute(
+        select(League).where(League.id == league_id)
+    )
+    league = result.scalar_one_or_none()
+    if not league or league.status not in (LeagueStatus.offseason, LeagueStatus.preseason):
+        raise HTTPException(status_code=400, detail='Board can only be set during offseason')
+
+    result = await db.execute(
+        select(Team).where(Team.league_id == league_id, Team.coach_id == coach.id)
+    )
+    team = result.scalar_one_or_none()
+    _require_team_in_league(team)
+
+    priority = body.get('position_priority', [])
+    if len(priority) != 5:
+        raise HTTPException(status_code=400, detail='position_priority must have exactly 5 slots')
+
+    valid_positions = {'QB','WR','TE','RB','OL','DT','DE','LB','CB','S','K','P', None}
+    for slot in priority:
+        if slot not in valid_positions:
+            raise HTTPException(status_code=400, detail=f'Invalid position: {slot}')
+
+    from sqlalchemy.orm.attributes import flag_modified
+    team.draft_board = {'position_priority': priority}
+    flag_modified(team, 'draft_board')
+    await db.commit()
+    return team.draft_board
