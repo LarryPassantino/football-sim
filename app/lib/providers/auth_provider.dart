@@ -10,6 +10,7 @@ class AuthProvider extends ChangeNotifier {
   String? _leagueId;
   String? _teamId;
   String? _teamName;
+  String? _pendingFcmToken;
 
   bool get isLoggedIn => _accessToken != null;
   String? get leagueId => _leagueId;
@@ -101,6 +102,13 @@ class AuthProvider extends ChangeNotifier {
     await prefs.setString('refresh_token', _refreshToken!);
   }
 
+  // Call this from main.dart whenever FCM issues a token.
+  // Registers immediately if logged in; otherwise stores it for after login.
+  Future<void> setFcmToken(String token) async {
+    _pendingFcmToken = token;
+    await registerFcmToken(token);
+  }
+
   Future<void> registerFcmToken(String token) async {
     if (_accessToken == null) return;
     try {
@@ -121,6 +129,7 @@ class AuthProvider extends ChangeNotifier {
     if (res.statusCode != 200) throw Exception(_errorDetail(res.body));
     await _saveTokens(jsonDecode(res.body));
     await _restoreTeam();
+    if (_pendingFcmToken != null) await registerFcmToken(_pendingFcmToken!);
     notifyListeners();
   }
 
@@ -137,6 +146,7 @@ class AuthProvider extends ChangeNotifier {
     if (res.statusCode != 201) throw Exception(_errorDetail(res.body));
     await _saveTokens(jsonDecode(res.body));
     await _restoreTeam();
+    if (_pendingFcmToken != null) await registerFcmToken(_pendingFcmToken!);
     notifyListeners();
   }
 

@@ -23,7 +23,7 @@ void main() async {
 
   // Re-register whenever FCM rotates the token.
   FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-    auth.registerFcmToken(token);
+    auth.setFcmToken(token);
   });
 
   runApp(
@@ -37,9 +37,7 @@ void main() async {
 Future<void> _setupFcm(AuthProvider auth) async {
   await FirebaseMessaging.instance.requestPermission();
   final token = await FirebaseMessaging.instance.getToken();
-  if (token != null && auth.isLoggedIn) {
-    await auth.registerFcmToken(token);
-  }
+  if (token != null) await auth.setFcmToken(token);
 }
 
 class FootballSimApp extends StatelessWidget {
