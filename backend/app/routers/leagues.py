@@ -1022,7 +1022,7 @@ async def get_league_leaders(league_id: uuid.UUID, db: AsyncSession = Depends(ge
         .join(Game, PlayerGameStats.game_id == Game.id)
         .join(Player, PlayerGameStats.player_id == Player.id)
         .outerjoin(Team, Player.team_id == Team.id)
-        .where(Game.season_id == season.id)
+        .where(Game.season_id == season.id, Game.is_playoff == False)  # noqa: E712
         .group_by(Player.id, Player.name, Player.position, Team.name)
     )
     rows = agg.all()

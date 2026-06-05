@@ -31,18 +31,28 @@ PLAYOFF_LEAGUE_CHAMP = 20
 # ============================================================
 
 def _assign_weeks(schedule: list[tuple], n_weeks: int = REGULAR_SEASON_WEEKS) -> dict[int, list[tuple]]:
-    weeks: dict[int, list] = {w: [] for w in range(1, n_weeks + 1)}
-    teams_per_week: dict[int, set] = {w: set() for w in range(1, n_weeks + 1)}
-
-    for h_idx, a_idx in schedule:
-        for w in range(1, n_weeks + 1):
-            if h_idx not in teams_per_week[w] and a_idx not in teams_per_week[w]:
-                weeks[w].append((h_idx, a_idx))
-                teams_per_week[w].add(h_idx)
-                teams_per_week[w].add(a_idx)
+    """Assign each game to a week. Retries with a fresh shuffle if any game can't be placed."""
+    games = list(schedule)
+    for _ in range(50):
+        random.shuffle(games)
+        weeks: dict[int, list] = {w: [] for w in range(1, n_weeks + 1)}
+        teams_per_week: dict[int, set] = {w: set() for w in range(1, n_weeks + 1)}
+        placed_all = True
+        for h_idx, a_idx in games:
+            placed = False
+            for w in range(1, n_weeks + 1):
+                if h_idx not in teams_per_week[w] and a_idx not in teams_per_week[w]:
+                    weeks[w].append((h_idx, a_idx))
+                    teams_per_week[w].add(h_idx)
+                    teams_per_week[w].add(a_idx)
+                    placed = True
+                    break
+            if not placed:
+                placed_all = False
                 break
-
-    return weeks
+        if placed_all:
+            return weeks
+    return weeks  # unreachable in practice
 
 
 # ============================================================
