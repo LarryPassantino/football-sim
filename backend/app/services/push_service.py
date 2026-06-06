@@ -5,7 +5,10 @@ Requires FIREBASE_SERVICE_ACCOUNT_JSON env var containing the service account
 JSON as a string. Silently no-ops if the env var is absent (local dev).
 """
 import json
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 _app = None
 
@@ -16,13 +19,16 @@ def _get_app():
         return _app
     sa_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON')
     if not sa_json:
+        logger.debug('FIREBASE_SERVICE_ACCOUNT_JSON not set — push disabled')
         return None
     try:
         import firebase_admin
         from firebase_admin import credentials
         cred = credentials.Certificate(json.loads(sa_json))
         _app = firebase_admin.initialize_app(cred)
-    except Exception:
+        logger.info('Firebase Admin SDK initialised')
+    except Exception as e:
+        logger.error('Firebase init failed: %s', e)
         return None
     return _app
 
@@ -50,5 +56,6 @@ def send_game_result(
             token=fcm_token,
         )
         messaging.send(message)
-    except Exception:
-        pass
+        logger.info('Push sent to %s: %s', team_name, result_word)
+    except Exception as e:
+        logger.error('Push send failed for %s: %s', team_name, e)

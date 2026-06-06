@@ -327,6 +327,8 @@ async def advance_week(db: AsyncSession, league_id: uuid.UUID) -> dict:
 
 async def _notify_game_result(db: AsyncSession, game: Game) -> None:
     """Send push notification to any human coach involved in this game."""
+    import logging
+    log = logging.getLogger(__name__)
     for team, my_score, opp_score, opponent in [
         (game.home_team, game.home_score, game.away_score, game.away_team.name),
         (game.away_team, game.away_score, game.home_score, game.home_team.name),
@@ -334,8 +336,12 @@ async def _notify_game_result(db: AsyncSession, game: Game) -> None:
         if not team.coach_id:
             continue
         coach = await db.get(Coach, team.coach_id)
-        if coach and coach.fcm_token:
-            send_game_result(coach.fcm_token, team.name, my_score, opp_score, opponent)
+        if not coach:
+            continue
+        if not coach.fcm_token:
+            log.warning('Coach %s (%s) has no FCM token — skipping push', coach.id, team.name)
+            continue
+        send_game_result(coach.fcm_token, team.name, my_score, opp_score, opponent)
 
 
 async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
