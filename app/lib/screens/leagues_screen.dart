@@ -89,6 +89,7 @@ class LeaguesScreen extends StatefulWidget {
 class _LeaguesScreenState extends State<LeaguesScreen> {
   _LeagueDetail? _league;
   _MyRecord? _record;
+  Map<String, _MyRecord> _teamRecords = {};
   _GameSummary? _lastGame;
   _GameSummary? _nextGame;
   String? _headline;
@@ -130,21 +131,23 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
       final standingsJson = jsonDecode(responses[1].body);
       final league = _LeagueDetail.fromJson(leagueJson);
 
-      // Find my record from standings
+      // Find my record from standings; store all records for opponent display
       _MyRecord? record;
       final Map<String, String> teamNames = {};
+      final Map<String, _MyRecord> teamRecords = {};
       for (final row in standingsJson['standings'] as List) {
         final r = row as Map<String, dynamic>;
-        teamNames[r['team_id'] as String] = r['name'] as String;
-        if (r['team_id'] == teamId) {
-          record = _MyRecord(
-            wins: r['wins'],
-            losses: r['losses'],
-            ties: r['ties'],
-            conference: r['conference'],
-            division: r['division'],
-          );
-        }
+        final tid = r['team_id'] as String;
+        teamNames[tid] = r['name'] as String;
+        final rec = _MyRecord(
+          wins: r['wins'],
+          losses: r['losses'],
+          ties: r['ties'],
+          conference: r['conference'],
+          division: r['division'],
+        );
+        teamRecords[tid] = rec;
+        if (tid == teamId) record = rec;
       }
 
       // Fetch full schedule to find last result and next game
@@ -208,6 +211,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
       setState(() {
         _league        = league;
         _record        = record;
+        _teamRecords   = teamRecords;
         _lastGame      = lastGame;
         _nextGame      = nextGame;
         _headline      = headline;
@@ -683,6 +687,17 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                     game.opponentName,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
+                  if (_teamRecords[game.opponentId] case final opp?) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      opp.ties > 0
+                          ? '${opp.wins}–${opp.losses}–${opp.ties}'
+                          : '${opp.wins}–${opp.losses}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   Icon(
                     Icons.open_in_new,
