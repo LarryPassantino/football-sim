@@ -25,6 +25,7 @@ from ..services.league_service import (
     PRESEASON_DAYS,
     advance_week,
     end_preseason,
+    generate_annual_draft_class,
     run_full_draft,
 )
 from sqlalchemy import select
@@ -54,11 +55,27 @@ async def main():
                 .limit(1)
             )
             last = result2.scalar_one_or_none()
-            if last and last.completed_at:
-                elapsed = (datetime.now(timezone.utc) - last.completed_at).days
-                if elapsed >= OFFSEASON_DAYS:
-                    await run_full_draft(db, league.id)
-                    print(f"[{league.name}] Draft complete — preseason started")
+            if not last or not last.completed_at:
+                print(f"[{league.name}] Offseason: no completed season found — skipping")
+                continue
+
+            # Ensure draft class was generated (guards against a prior crash in end_season)
+            draft_ready = (
+                last.draft_state and
+                last.draft_state.get('order') and
+                last.draft_state.get('total_picks')
+            )
+            if not draft_ready:
+                print(f"[{league.name}] Offseason: draft class missing — generating now")
+                await generate_annual_draft_class(db, league.id)
+                print(f"[{league.name}] Offseason: draft class generated")
+                continue  # let next cron run handle elapsed check cleanly
+
+            elapsed = (datetime.now(timezone.utc) - last.completed_at).days
+            print(f"[{league.name}] Offseason: {elapsed}/{OFFSEASON_DAYS} days elapsed")
+            if elapsed >= OFFSEASON_DAYS:
+                await run_full_draft(db, league.id)
+                print(f"[{league.name}] Draft complete — preseason started")
 
         # ── Preseason → start regular season after window expires ───────────
         result = await db.execute(
