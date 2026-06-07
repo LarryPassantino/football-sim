@@ -1176,8 +1176,12 @@ async def set_draft_board(
         if slot not in valid_positions:
             raise HTTPException(status_code=400, detail=f'Invalid position: {slot}')
 
+    player_ranking = body.get('player_ranking', [])
+    if not isinstance(player_ranking, list):
+        raise HTTPException(status_code=400, detail='player_ranking must be a list')
+
     from sqlalchemy.orm.attributes import flag_modified
-    team.draft_board = {'position_priority': priority}
+    team.draft_board = {'position_priority': priority, 'player_ranking': player_ranking}
     flag_modified(team, 'draft_board')
     await db.commit()
     return team.draft_board

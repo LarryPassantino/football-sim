@@ -19,6 +19,7 @@
 ## Engagement
 - [x] Game plan — weekly OFF/DEF setting (Balanced / Run Focus / Pass Focus; Balanced / Run Stop / Pass Rush); resets to Balanced each week advance so user must actively choose; set on the matchup screen pre-game; sim reads it and applies play-call probability + stat modifiers; CPU teams get a plan too (random or composite-based)
 - [x] Team news feed — single current-week headline computed on the fly from live data (no DB table); sources: last result, W/L streak, playoff position, injuries, star player performance; shown on team home screen above or within the alerts card
+- [ ] Team news — playoff spectator mode: once a team is eliminated, news slot shows league-wide playoff coverage (conference championship matchup previews → league championship preview → champion announcement); both conferences shown regardless of which conference your team is in
 - [x] Push notification on game simmed — fires from cron immediately after the human coach's game resolves; message: "Your [team] just [won/lost/tied] [score] against [opponent]. Open the app to see the box score."
 
 ## Polish
@@ -36,6 +37,7 @@
   - League source: dedicated CPU-only league per contest, or fantasy overlay on top of an existing regular league?
 
 ## Long-term / v3
+- [ ] Randomized league/conference/division names — themed name sets generated at league creation (e.g. Tree League → Oak Conference & Maple Conference → Bark, Sapling, Leaf, Branch divisions); each league gets its own theme; requires storing names on League/Team or generating deterministically from league ID seed
 - [ ] Aging, decline, and retirement — age curves, fitness-weighted stat decay, retirement threshold (floor ~45 composite)
 - [ ] Annual draft class — smaller than season 1 pool (~60–70% size) to avoid FA pool inflation
 - [ ] FA pool management — roster-less decline: players in FA at end of season take an extra decline tick on top of normal age decay; players below composite floor retire out of the pool entirely; active signings by CPU + human drain mid-tier naturally

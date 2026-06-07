@@ -56,14 +56,16 @@ class DraftScreen extends StatefulWidget {
 class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStateMixin {
   late TabController _tabs;
 
-  // Board
+  // Board (position priority)
   List<String?> _board = [null, null, null, null, null];
   bool _boardLoading = true;
   bool _boardSaving = false;
 
-  // Class
-  List<_DraftPlayer> _draftClass = [];
+  // Class + personal ranking
+  List<_DraftPlayer> _draftClass = [];   // ordered by _playerRanking then composite
+  List<String> _playerRanking = [];      // player IDs in coach's preferred order
   bool _classLoading = true;
+  bool _rankingSaving = false;
   String? _classFilter;
 
   // Results
@@ -96,8 +98,10 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final priority = data['position_priority'] as List;
+        final ranking = (data['player_ranking'] as List? ?? []).cast<String>();
         setState(() {
           _board = priority.map((e) => e as String?).toList();
+          _playerRanking = ranking;
         });
       }
     } finally {
@@ -115,13 +119,31 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
       );
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List;
+        final players = list.map((j) => _DraftPlayer.fromJson(j as Map<String, dynamic>)).toList();
         setState(() {
-          _draftClass = list.map((j) => _DraftPlayer.fromJson(j as Map<String, dynamic>)).toList();
+          _draftClass = _applyRanking(players, _playerRanking);
         });
       }
     } finally {
       if (mounted) setState(() => _classLoading = false);
     }
+  }
+
+  /// Orders players by _playerRanking (ranked first in order), then unranked by composite desc.
+  List<_DraftPlayer> _applyRanking(List<_DraftPlayer> players, List<String> ranking) {
+    if (ranking.isEmpty) return players;
+    final rankIndex = {for (int i = 0; i < ranking.length; i++) ranking[i]: i};
+    final ranked   = <_DraftPlayer>[];
+    final unranked = <_DraftPlayer>[];
+    for (final p in players) {
+      if (rankIndex.containsKey(p.id)) {
+        ranked.add(p);
+      } else {
+        unranked.add(p);
+      }
+    }
+    ranked.sort((a, b) => rankIndex[a.id]!.compareTo(rankIndex[b.id]!));
+    return [...ranked, ...unranked];
   }
 
   Future<void> _loadResults() async {
@@ -147,17 +169,33 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
 
   Future<void> _saveBoard() async {
     setState(() => _boardSaving = true);
+    await _persistBoard(saving: 'board');
+    if (mounted) setState(() => _boardSaving = false);
+  }
+
+  Future<void> _saveRanking() async {
+    setState(() => _rankingSaving = true);
+    // Build ranking from current _draftClass order
+    _playerRanking = _draftClass.map((p) => p.id).toList();
+    await _persistBoard(saving: 'ranking');
+    if (mounted) setState(() => _rankingSaving = false);
+  }
+
+  Future<void> _persistBoard({required String saving}) async {
     final auth = context.read<AuthProvider>();
     try {
       final res = await http.put(
         Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/draft/board'),
         headers: {...auth.authHeaders, 'Content-Type': 'application/json'},
-        body: jsonEncode({'position_priority': _board}),
+        body: jsonEncode({
+          'position_priority': _board,
+          'player_ranking': _playerRanking,
+        }),
       );
       if (!mounted) return;
       if (res.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Draft board saved')),
+          SnackBar(content: Text(saving == 'ranking' ? 'Player ranking saved' : 'Draft board saved')),
         );
       } else {
         final msg = (jsonDecode(res.body) as Map<String, dynamic>)['detail'] ?? 'Save failed';
@@ -169,8 +207,6 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
           SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
         );
       }
-    } finally {
-      if (mounted) setState(() => _boardSaving = false);
     }
   }
 
@@ -191,7 +227,7 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
         ],
         bottom: TabBar(
           controller: _tabs,
-          tabs: const [Tab(text: 'Board'), Tab(text: 'Draft Class'), Tab(text: 'Results')],
+          tabs: const [Tab(text: 'Team Needs'), Tab(text: 'Draft Class'), Tab(text: 'Results')],
         ),
       ),
       body: TabBarView(
@@ -248,20 +284,25 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: DropdownButtonFormField<String?>(
-            initialValue: _board[index],
+          child: InputDecorator(
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              hintText: 'Best available',
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             ),
-            items: [
-              const DropdownMenuItem<String?>(value: null, child: Text('Best available')),
-              ..._kPositions.map(
-                (pos) => DropdownMenuItem<String?>(value: pos, child: Text(pos)),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: _board[index],
+                isExpanded: true,
+                hint: const Text('Best available'),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('Best available')),
+                  ..._kPositions.map(
+                    (pos) => DropdownMenuItem<String?>(value: pos, child: Text(pos)),
+                  ),
+                ],
+                onChanged: (val) => setState(() => _board[index] = val),
               ),
-            ],
-            onChanged: (val) => setState(() => _board[index] = val),
+            ),
           ),
         ),
       ],
@@ -280,26 +321,55 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
         ),
       );
     }
+
+    // When a filter is active, show a plain scrollable list (can't reorder a subset).
+    // When showing all, use ReorderableListView so coaches can drag to rank.
     final filtered = _classFilter == null
-        ? _draftClass
+        ? null
         : _draftClass.where((p) => p.position == _classFilter).toList();
+
     return Column(
       children: [
         _buildPositionFilter(),
         Expanded(
-          child: filtered.isEmpty
-              ? Center(
-                  child: Text(
-                    'No $_classFilter in draft class',
-                    style: TextStyle(color: Theme.of(context).colorScheme.outline),
-                  ),
-                )
-              : ListView.builder(
-                  padding: EdgeInsets.only(bottom: 16 + MediaQuery.of(context).padding.bottom),
-                  itemCount: filtered.length,
-                  itemBuilder: (_, i) => _buildClassRow(filtered[i]),
+          child: filtered != null
+              ? (filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No $_classFilter in draft class',
+                        style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: EdgeInsets.only(bottom: 16 + MediaQuery.of(context).padding.bottom),
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) => _buildClassRow(filtered[i], key: ValueKey(filtered[i].id)),
+                    ))
+              : ReorderableListView.builder(
+                  padding: EdgeInsets.only(bottom: 80 + MediaQuery.of(context).padding.bottom),
+                  itemCount: _draftClass.length,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (newIndex > oldIndex) newIndex--;
+                      final item = _draftClass.removeAt(oldIndex);
+                      _draftClass.insert(newIndex, item);
+                    });
+                  },
+                  itemBuilder: (_, i) => _buildClassRow(_draftClass[i], key: ValueKey(_draftClass[i].id)),
                 ),
         ),
+        if (_classFilter == null)
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: FilledButton(
+                onPressed: _rankingSaving ? null : _saveRanking,
+                child: _rankingSaving
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Save Ranking'),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -329,11 +399,22 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildClassRow(_DraftPlayer player) {
+  Widget _buildClassRow(_DraftPlayer player, {required Key key}) {
     return ListTile(
+      key: key,
       title: Text(player.name),
       subtitle: Text('${player.position}  ·  Age ${player.age}  ·  ${player.composite}'),
-      trailing: Icon(Icons.info_outline, size: 18, color: Theme.of(context).colorScheme.outline),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(Icons.info_outline, size: 18, color: Theme.of(context).colorScheme.outline),
+            onPressed: () => _showPlayerDetail(player),
+          ),
+          if (_classFilter == null)
+            Icon(Icons.drag_handle, size: 18, color: Theme.of(context).colorScheme.outline),
+        ],
+      ),
       onTap: () => _showPlayerDetail(player),
     );
   }

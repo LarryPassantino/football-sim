@@ -598,8 +598,8 @@ async def _draft_order_from_standings(db: AsyncSession, league_id: uuid.UUID) ->
         return [t.id for t in result.scalars().all()]
 
     standings = await _get_standings(db, last)
-    ranked = _sort_standings(standings)
-    ranked.reverse()  # _sort_standings is best→worst; flip for draft (worst picks first)
+    ranked = sorted(standings.values(), key=cmp_to_key(_compare_teams))
+    ranked.reverse()  # sorted() is best→worst; flip for draft (worst picks first)
     return [r['team_id'] for r in ranked]
 
 
@@ -644,6 +644,18 @@ async def generate_annual_draft_class(db: AsyncSession, league_id: uuid.UUID) ->
         'order':       order_str,
         'picks':       [],
     }
+
+    # Clear per-coach player rankings — prior class IDs are invalid for the new class
+    result = await db.execute(select(Team).where(Team.league_id == league_id))
+    from sqlalchemy.orm.attributes import flag_modified
+    for team in result.scalars().all():
+        if team.draft_board:
+            team.draft_board = {
+                'position_priority': team.draft_board.get('position_priority', [None] * 5),
+                'player_ranking': [],
+            }
+            flag_modified(team, 'draft_board')
+
     await db.commit()
 
 
@@ -681,12 +693,26 @@ def _board_draft_pick(
     best available at the first position within DRAFT_TOLERANCE of the overall
     best player. Falls back to overall best if no priority position qualifies.
 
+    If player_ranking is provided (list of player ID strings), it is used to
+    determine preference order instead of composite. Unranked players fall back
+    to composite ordering.
+
     Returns (player, priority_position_used_or_None).
     """
     if not available:
         return None, None
 
-    best_overall = max(available, key=lambda p: p.composite)
+    if player_ranking:
+        rank_index = {pid: i for i, pid in enumerate(player_ranking)}
+
+        def rank_key(p):
+            pid = str(p.id)
+            return (0, rank_index[pid]) if pid in rank_index else (1, -p.composite)
+    else:
+        def rank_key(p):
+            return (0, -p.composite)
+
+    best_overall = min(available, key=rank_key)
 
     by_pos: dict[str, list] = defaultdict(list)
     for p in available:
@@ -698,7 +724,7 @@ def _board_draft_pick(
         candidates = by_pos.get(pos, [])
         if not candidates:
             continue
-        best_at_pos = max(candidates, key=lambda p: p.composite)
+        best_at_pos = min(candidates, key=rank_key)
         if best_overall.composite - best_at_pos.composite <= DRAFT_TOLERANCE:
             return best_at_pos, pos
 
@@ -759,9 +785,10 @@ async def run_full_draft(db: AsyncSession, league_id: uuid.UUID) -> None:
         team = teams[team_id]
         if team.coach_id is not None:
             # Human team — use draft board
-            board    = team.draft_board or {}
-            priority = board.get('position_priority', [])
-            player, pos_used = _board_draft_pick(available, priority, positions_filled[team_id])
+            board          = team.draft_board or {}
+            priority       = board.get('position_priority', [])
+            player_ranking = board.get('player_ranking', [])
+            player, pos_used = _board_draft_pick(available, priority, positions_filled[team_id], player_ranking)
             if pos_used:
                 positions_filled[team_id].add(pos_used)
         else:
