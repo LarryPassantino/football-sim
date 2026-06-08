@@ -571,7 +571,7 @@ async def start_new_season(db: AsyncSession, league_id: uuid.UUID) -> None:
 # ============================================================
 
 DRAFT_ROUNDS     = 5
-DRAFT_CLASS_SIZE = 100
+DRAFT_CLASS_SIZE = 160
 DRAFT_CLASS_AGES = [21, 21, 22, 22, 22, 23, 23, 23]
 DRAFT_TOLERANCE  = 5.0   # composite points; within this, follow position priority
 PRESEASON_DAYS   = 2
@@ -862,7 +862,7 @@ async def get_draft_class(db: AsyncSession, league_id: uuid.UUID) -> list[dict]:
     result = await db.execute(
         select(Player)
         .where(Player.league_id == league_id, Player.is_draft_eligible == True)
-        .order_by(Player.position, Player.composite.desc())
+        .order_by(Player.composite.desc())
     )
     out = []
     for p in result.scalars().all():
