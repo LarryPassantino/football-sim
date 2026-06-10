@@ -414,10 +414,10 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     } else if (status == 'offseason') {
       final days = _league?.offseasonDaysRemaining;
       final subtitle = days == null || days <= 0
-          ? 'New season starting soon'
+          ? 'Draft running soon'
           : days == 1
-              ? 'New season starts tomorrow'
-              : 'New season starts in $days days';
+              ? 'Draft tomorrow — set your board'
+              : 'Draft in $days days — set your board';
       alerts.add(_alertTile(
         icon: Icons.sports_football,
         color: Theme.of(context).colorScheme.primary,
