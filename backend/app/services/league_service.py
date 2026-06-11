@@ -713,6 +713,9 @@ async def generate_annual_draft_class(db: AsyncSession, league_id: uuid.UUID) ->
 
 def _cpu_draft_pick(available: list, roster_counts: dict[str, int]) -> 'Player | None':
     """Pick best available for a CPU team using urgency scoring."""
+    if not available:
+        return None
+
     def urgency(pos: str) -> float:
         deficit = max(0, ROSTER_SLOTS[pos] - roster_counts.get(pos, 0))
         if deficit <= 0:
@@ -723,14 +726,18 @@ def _cpu_draft_pick(available: list, roster_counts: dict[str, int]) -> 'Player |
     for p in available:
         by_pos[p.position].append(p)
 
-    best_pos = max(
-        (pos for pos in by_pos if by_pos[pos]),
-        key=urgency,
-        default=None,
-    )
-    if best_pos is None:
-        return None
-    return max(by_pos[best_pos], key=lambda p: p.composite)
+    best_urgency = max(urgency(pos) for pos in by_pos if by_pos[pos])
+
+    if best_urgency > 0:
+        # Genuine roster need — pick best at the most urgent position
+        best_pos = max(
+            (pos for pos in by_pos if by_pos[pos]),
+            key=urgency,
+        )
+        return max(by_pos[best_pos], key=lambda p: p.composite)
+    else:
+        # Rosters full — pick best available overall regardless of position
+        return max(available, key=lambda p: p.composite)
 
 
 def _board_draft_pick(

@@ -372,6 +372,22 @@ async def release_player(
     if not player or player.team_id != team_id:
         raise HTTPException(status_code=400, detail='Player not on your team')
 
+    # Enforce starter floor — can't release below the minimum active count for the position
+    if not player.on_ir:
+        min_active = _POSITION_STARTERS.get(player.position, 1)
+        result = await db.execute(
+            select(func.count()).where(
+                Player.team_id  == team_id,
+                Player.on_ir    == False,  # noqa: E712
+                Player.position == player.position,
+            )
+        )
+        if result.scalar() <= min_active:
+            raise HTTPException(
+                status_code=409,
+                detail=f'Cannot release — minimum {min_active} active {player.position} required',
+            )
+
     player.team_id = None
     player.on_ir   = False
     await db.flush()

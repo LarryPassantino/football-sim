@@ -86,6 +86,7 @@ class _RosterScreenState extends State<RosterScreen> {
       appBar: AppBar(
         title: Text(widget.teamName),
         actions: [
+          IconButton(icon: const Icon(Icons.info_outline), onPressed: _showRosterLimits),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
@@ -94,6 +95,51 @@ class _RosterScreenState extends State<RosterScreen> {
           : _players == null
               ? const Center(child: CircularProgressIndicator())
               : _buildRoster(),
+    );
+  }
+
+  void _showRosterLimits() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Roster Limits'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in _positionGroups.entries) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    entry.key.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              for (final pos in entry.value)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 36, child: Text(pos, style: const TextStyle(fontWeight: FontWeight.w600))),
+                      Text(
+                        '${_positionMin[pos]}–${_positionMax[pos]}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
     );
   }
 
@@ -267,6 +313,11 @@ class _RosterScreenState extends State<RosterScreen> {
   static const _positionMax = {
     'QB': 2, 'WR': 5, 'TE': 2, 'RB': 3, 'OL': 6,
     'DT': 4, 'DE': 4, 'LB': 5, 'CB': 4, 'S': 4, 'K': 1, 'P': 1,
+  };
+
+  static const _positionMin = {
+    'QB': 1, 'WR': 3, 'TE': 1, 'RB': 1, 'OL': 5,
+    'DT': 2, 'DE': 2, 'LB': 3, 'CB': 2, 'S': 2, 'K': 1, 'P': 1,
   };
 
   void _showActivateDialog(_Player irPlayer) {
