@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from functools import cmp_to_key
 
-from sqlalchemy import func, select, or_
+from sqlalchemy import delete, func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -801,6 +801,12 @@ async def run_full_draft(db: AsyncSession, league_id: uuid.UUID) -> None:
     )
     season = result.scalar_one()
     state  = dict(season.draft_state)
+
+    # If picks were already committed in a prior run, skip straight to finalization
+    if state.get('picks'):
+        await _finalize_draft(db, league_id)
+        return
+
     order  = [uuid.UUID(tid) for tid in state['order']]
     n      = len(order)
 
@@ -890,6 +896,9 @@ async def _finalize_draft(db: AsyncSession, league_id: uuid.UUID) -> None:
             .order_by(Player.composite.desc())
         )
         for excess in result.scalars().all()[cap:]:
+            await db.execute(
+                delete(PlayerGameStats).where(PlayerGameStats.player_id == excess.id)
+            )
             await db.delete(excess)
 
     result = await db.execute(select(League).where(League.id == league_id))
