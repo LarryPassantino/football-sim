@@ -132,7 +132,7 @@ async def play_game(
     home_gd = apply_gameplan(build_game_day_sim_team(home_sim), home_off_plan, home_def_plan)
     away_gd = apply_gameplan(build_game_day_sim_team(away_sim), away_off_plan, away_def_plan)
 
-    home_score, away_score, home_outcomes, away_outcomes = simulate_game(
+    home_score, away_score, home_outcomes, away_outcomes, raw_scoring_plays = simulate_game(
         home_gd, away_gd, is_playoff=game.is_playoff,
     )
 
@@ -154,10 +154,71 @@ async def play_game(
     await _save_player_stats(db, game.id, home_team.id, home_off, home_def)
     await _save_player_stats(db, game.id, away_team.id, away_off, away_def)
 
+    # Attribute scoring plays to players and store
+    game.scoring_plays = _attribute_scoring_plays(
+        raw_scoring_plays, home_sim, away_sim, home_off, away_off,
+    )
     game.home_score = home_score
     game.away_score = away_score
     game.status     = GameStatus.complete
     game.played_at  = datetime.now(timezone.utc)
+
+
+def _attribute_scoring_plays(
+    raw_plays: list,
+    home_sim: dict,
+    away_sim: dict,
+    home_off: dict,
+    away_off: dict,
+) -> list:
+    """
+    Attach player names and TD types to each scoring play.
+    Touchdowns are attributed using the player stat totals from generate_game_stats.
+    Field goals get no player attribution. Order within team doesn't matter.
+    """
+    def _id_to_name(sim_team: dict) -> dict:
+        m = {}
+        for players in sim_team['roster'].values():
+            for p in players:
+                m[p['_db_id']] = p['name']
+        return m
+
+    def _td_pool(off_stats: dict, id_to_name: dict) -> list:
+        pool = []
+        for pid, stats in off_stats.items():
+            name = id_to_name.get(pid, 'Unknown')
+            for _ in range(stats.get('rush_tds', 0)):
+                pool.append((name, 'rushing'))
+            for _ in range(stats.get('receiving_tds', 0)):
+                pool.append((name, 'receiving'))
+        return pool
+
+    home_names  = _id_to_name(home_sim)
+    away_names  = _id_to_name(away_sim)
+    home_pool   = _td_pool(home_off, home_names)
+    away_pool   = _td_pool(away_off, away_names)
+    home_td_idx = away_td_idx = 0
+
+    attributed = []
+    for play in raw_plays:
+        entry = {
+            'quarter':     play['quarter'],
+            'team':        'home' if play['team'] == 'a' else 'away',
+            'type':        play['type'],
+            'score_home':  play['score_a'],
+            'score_away':  play['score_b'],
+            'player_name': None,
+            'td_type':     None,
+        }
+        if play['type'] == 'touchdown':
+            if play['team'] == 'a' and home_td_idx < len(home_pool):
+                entry['player_name'], entry['td_type'] = home_pool[home_td_idx]
+                home_td_idx += 1
+            elif play['team'] == 'b' and away_td_idx < len(away_pool):
+                entry['player_name'], entry['td_type'] = away_pool[away_td_idx]
+                away_td_idx += 1
+        attributed.append(entry)
+    return attributed
 
 
 async def _save_player_stats(

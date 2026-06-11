@@ -113,9 +113,10 @@ class Game(Base):
     away_team_id: Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), ForeignKey('teams.id'), nullable=False)
     home_score:   Mapped[int|None]       = mapped_column(Integer, nullable=True)
     away_score:   Mapped[int|None]       = mapped_column(Integer, nullable=True)
-    status:       Mapped[GameStatus]     = mapped_column(default=GameStatus.scheduled)
-    is_playoff:   Mapped[bool]           = mapped_column(Boolean, default=False)
-    played_at:    Mapped[datetime|None]  = mapped_column(DateTime(timezone=True), nullable=True)
+    status:         Mapped[GameStatus]     = mapped_column(default=GameStatus.scheduled)
+    is_playoff:     Mapped[bool]           = mapped_column(Boolean, default=False)
+    played_at:      Mapped[datetime|None]  = mapped_column(DateTime(timezone=True), nullable=True)
+    scoring_plays:  Mapped[list | None]    = mapped_column(JSONB, nullable=True)
 
     home_team: Mapped['Team'] = relationship('Team', foreign_keys=[home_team_id], lazy='noload')
     away_team: Mapped['Team'] = relationship('Team', foreign_keys=[away_team_id], lazy='noload')

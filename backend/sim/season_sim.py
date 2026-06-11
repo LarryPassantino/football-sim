@@ -170,7 +170,7 @@ def run_season(draft_teams, schedule):
         roll_pregame_injuries(h, h_remaining)
         roll_pregame_injuries(a, a_remaining)
 
-        sh, sa, _, _ = simulate_game(
+        sh, sa, _, _, _ = simulate_game(
             build_game_day_sim_team(h),
             build_game_day_sim_team(a),
         )
@@ -251,7 +251,7 @@ def _playoff_game(name_to_draft, row_a, row_b):
 
     sa = sb = 0
     while sa == sb:
-        sa, sb, _, _ = simulate_game(
+        sa, sb, _, _, _ = simulate_game(
             build_game_day_sim_team(dt_a),
             build_game_day_sim_team(dt_b),
         )

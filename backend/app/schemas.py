@@ -125,6 +125,7 @@ class GameDetailResponse(BaseModel):
     played_at:      datetime | None
     home_stats:     list[PlayerStatLine]
     away_stats:     list[PlayerStatLine]
+    scoring_plays:  list | None = None
 
 
 class PlayerScoutItem(BaseModel):

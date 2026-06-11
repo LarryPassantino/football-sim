@@ -311,15 +311,32 @@ def simulate_game(team_a, team_b, is_playoff=False):
     score_a = score_b = 0
     outcomes_a = defaultdict(int)
     outcomes_b = defaultdict(int)
+    scoring_plays = []
+    drive_idx = 0  # overall drive counter across both teams; 6 drives per quarter
+
+    def _record(team, out, pts):
+        if pts > 0:
+            quarter = min(drive_idx // 6 + 1, 4)
+            scoring_plays.append({
+                'team':    team,
+                'type':    out,
+                'score_a': score_a,
+                'score_b': score_b,
+                'quarter': quarter,
+            })
 
     for _ in range(DRIVES_PER_TEAM):
         out, pts = resolve_drive(a, b)
         score_a += pts
         outcomes_a[out] += 1
+        _record('a', out, pts)
+        drive_idx += 1
 
         out, pts = resolve_drive(b, a)
         score_b += pts
         outcomes_b[out] += 1
+        _record('b', out, pts)
+        drive_idx += 1
 
     # Overtime: each team gets one drive per period, stop when someone leads
     for _ in range(OT_PERIODS):
@@ -328,10 +345,14 @@ def simulate_game(team_a, team_b, is_playoff=False):
         out, pts = resolve_drive(a, b)
         score_a += pts
         outcomes_a[out] += 1
+        if pts > 0:
+            scoring_plays.append({'team': 'a', 'type': out, 'score_a': score_a, 'score_b': score_b, 'quarter': 5})
 
         out, pts = resolve_drive(b, a)
         score_b += pts
         outcomes_b[out] += 1
+        if pts > 0:
+            scoring_plays.append({'team': 'b', 'type': out, 'score_a': score_a, 'score_b': score_b, 'quarter': 5})
 
     # Playoff games can't end in a tie — keep going until someone leads
     if is_playoff:
@@ -339,12 +360,16 @@ def simulate_game(team_a, team_b, is_playoff=False):
             out, pts = resolve_drive(a, b)
             score_a += pts
             outcomes_a[out] += 1
+            if pts > 0:
+                scoring_plays.append({'team': 'a', 'type': out, 'score_a': score_a, 'score_b': score_b, 'quarter': 5})
 
             out, pts = resolve_drive(b, a)
             score_b += pts
             outcomes_b[out] += 1
+            if pts > 0:
+                scoring_plays.append({'team': 'b', 'type': out, 'score_a': score_a, 'score_b': score_b, 'quarter': 5})
 
-    return score_a, score_b, outcomes_a, outcomes_b
+    return score_a, score_b, outcomes_a, outcomes_b, scoring_plays
 
 
 # ============================================================

@@ -37,8 +37,8 @@
   - League source: dedicated CPU-only league per contest, or fantasy overlay on top of an existing regular league?
 
 ## Long-term / v3
-- [ ] Randomized league/conference/division names — themed name sets generated at league creation (e.g. Tree League → Oak Conference & Maple Conference → Bark, Sapling, Leaf, Branch divisions); each league gets its own theme; requires storing names on League/Team or generating deterministically from league ID seed
+- [ ] Randomized league/conference/division names — pool of curated theme families (Storm, Celestial, Geological, Ocean, Fire, etc.), each with 6 names; at league creation pick one theme at random, assign 1 name to league, 2 to conferences, 4 to divisions (no repeats); conference and division names are thematic peers, not a strict hierarchy; pool is easy to extend; requires storing generated names on League/Team models
 - [ ] Aging, decline, and retirement — age curves, fitness-weighted stat decay, retirement threshold (floor ~45 composite)
-- [ ] Annual draft class — smaller than season 1 pool (~60–70% size) to avoid FA pool inflation
+- [x] Annual draft class — smaller than season 1 pool (~60–70% size) to avoid FA pool inflation
 - [ ] FA pool management — roster-less decline: players in FA at end of season take an extra decline tick on top of normal age decay; players below composite floor retire out of the pool entirely; active signings by CPU + human drain mid-tier naturally
 - [ ] --POST LAUNCH-- Cross-League Championship — Champions League style; season winners enter a playoff pool every 2–3 months, set starters, sim only

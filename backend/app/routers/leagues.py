@@ -556,6 +556,7 @@ async def get_game_detail(
         played_at=game.played_at,
         home_stats=home_stats,
         away_stats=away_stats,
+        scoring_plays=game.scoring_plays,
     )
 
 

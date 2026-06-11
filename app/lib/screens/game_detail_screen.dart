@@ -44,6 +44,25 @@ class _StatLine {
                            forcedFumbles > 0 || fumbleRecoveries > 0;
 }
 
+class _ScoringPlay {
+  final int quarter;
+  final String team; // 'home' or 'away'
+  final String type; // 'touchdown' or 'field_goal'
+  final int scoreHome;
+  final int scoreAway;
+  final String? playerName;
+  final String? tdType; // 'rushing' or 'receiving'
+
+  _ScoringPlay.fromJson(Map<String, dynamic> j)
+      : quarter    = j['quarter'],
+        team       = j['team'],
+        type       = j['type'],
+        scoreHome  = j['score_home'],
+        scoreAway  = j['score_away'],
+        playerName = j['player_name'] as String?,
+        tdType     = j['td_type'] as String?;
+}
+
 class _GameDetail {
   final int week;
   final bool isPlayoff;
@@ -54,6 +73,7 @@ class _GameDetail {
   final String status;
   final List<_StatLine> homeStats;
   final List<_StatLine> awayStats;
+  final List<_ScoringPlay>? scoringPlays;
 
   _GameDetail.fromJson(Map<String, dynamic> j)
       : week         = j['week'],
@@ -68,7 +88,12 @@ class _GameDetail {
             .toList(),
         awayStats    = (j['away_stats'] as List)
             .map((s) => _StatLine.fromJson(s as Map<String, dynamic>))
-            .toList();
+            .toList(),
+        scoringPlays = j['scoring_plays'] == null
+            ? null
+            : (j['scoring_plays'] as List)
+                .map((p) => _ScoringPlay.fromJson(p as Map<String, dynamic>))
+                .toList();
 }
 
 class GameDetailScreen extends StatefulWidget {
@@ -119,7 +144,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: _game == null
@@ -131,6 +156,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
           bottom: _game == null
               ? null
               : TabBar(tabs: [
+                  const Tab(text: 'Scoring'),
                   Tab(text: _game!.awayTeamName),
                   Tab(text: _game!.homeTeamName),
                 ]),
@@ -144,6 +170,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                       _buildScoreHeader(),
                       Expanded(
                         child: TabBarView(children: [
+                          _buildScoringTab(),
                           _buildBoxScore(_game!.awayStats),
                           _buildBoxScore(_game!.homeStats),
                         ]),
@@ -187,6 +214,99 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildScoringTab() {
+    final plays = _game!.scoringPlays;
+    if (plays == null) {
+      return Center(
+        child: Text(
+          'No scoring data for this game',
+          style: TextStyle(color: Theme.of(context).colorScheme.outline),
+        ),
+      );
+    }
+    if (plays.isEmpty) {
+      return Center(
+        child: Text(
+          '0 – 0',
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
+      );
+    }
+
+    final quarterLabels = {1: '1ST QUARTER', 2: '2ND QUARTER', 3: '3RD QUARTER', 4: '4TH QUARTER', 5: 'OVERTIME'};
+    final items = <Widget>[];
+    int? lastQuarter;
+
+    for (final play in plays) {
+      if (play.quarter != lastQuarter) {
+        lastQuarter = play.quarter;
+        items.add(Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Text(
+            quarterLabels[play.quarter] ?? 'OT',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ));
+      }
+
+      final isHome = play.team == 'home';
+      final teamName = isHome ? _game!.homeTeamName : _game!.awayTeamName;
+      final scoreStr = '${play.scoreAway}–${play.scoreHome}';
+
+      String description;
+      if (play.type == 'field_goal') {
+        description = 'Field Goal';
+      } else if (play.playerName != null) {
+        final typeLabel = play.tdType == 'rushing' ? 'Rushing TD' : 'Receiving TD';
+        description = '${play.playerName} · $typeLabel';
+      } else {
+        description = 'Touchdown';
+      }
+
+      items.add(Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 44,
+              child: Text(
+                scoreStr,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              play.type == 'field_goal' ? Icons.sports_score : Icons.sports_football,
+              size: 16,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(teamName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(description, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ));
+    }
+
+    return ListView(
+      padding: EdgeInsets.only(bottom: 24 + MediaQuery.of(context).padding.bottom),
+      children: items,
     );
   }
 
