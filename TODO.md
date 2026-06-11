@@ -11,7 +11,7 @@
 - [ ] Trade — n-for-n trades (post-v1)
 - [ ] Team history view — season-by-season W/L record tied to team_id, survives name changes
 - [x] Team names unique per league (validation on rename + league creation)
-- [ ] Scoring play log — requires sim changes to record plays in sequence + new DB table; natural companion to game detail screen
+- [x] Scoring play log — requires sim changes to record plays in sequence + new DB table; natural companion to game detail screen
 
 ## Social
 - [ ] League message board — coaches can post text messages visible to all coaches in the league; persistent across the season; natural home for trade talk, trash talk, and draft reactions; open design questions: threaded vs. flat, moderation, per-season vs. all-time archive

@@ -52,10 +52,8 @@ def build_schedule(teams):
                 games.append((h, aw))
 
     # Cross-conference (7 of 8 opponents, skip bijection for balance)
-    games.extend(_cross_conf_games(
-        by_conf['Conference A'],
-        by_conf['Conference B'],
-    ))
+    conf_keys = list(by_conf.keys())
+    games.extend(_cross_conf_games(by_conf[conf_keys[0]], by_conf[conf_keys[1]]))
 
     random.shuffle(games)
     return games

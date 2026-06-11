@@ -27,6 +27,57 @@ PLAYOFF_LEAGUE_CHAMP = 20
 
 
 # ============================================================
+# LEAGUE THEME FAMILIES
+# Each family: league name + 6 member names (2 conferences, 4 divisions).
+# Members are shuffled at league creation — conferences get [0-1], divisions [2-5].
+# ============================================================
+
+_THEME_FAMILIES = [
+    {'league': 'Storm',     'members': ['Thunder',  'Lightning', 'Gale',    'Tempest', 'Squall',  'Cyclone']},
+    {'league': 'Celestial', 'members': ['Nova',     'Pulsar',    'Eclipse', 'Aurora',  'Comet',   'Solaris']},
+    {'league': 'Glacier',   'members': ['Summit',   'Crevasse',  'Ridge',   'Crest',   'Basin',   'Frost']},
+    {'league': 'Ocean',     'members': ['Tide',     'Reef',      'Current', 'Surge',   'Shoal',   'Abyss']},
+    {'league': 'Ember',     'members': ['Blaze',    'Cinder',    'Flare',   'Inferno', 'Smolder', 'Ash']},
+    {'league': 'Iron',      'members': ['Anvil',    'Steel',     'Alloy',   'Temper',  'Slag',    'Ingot']},
+    {'league': 'Thorn',     'members': ['Briar',    'Thistle',   'Nettle',  'Bramble', 'Sedge',   'Spine']},
+    {'league': 'Dusk',      'members': ['Twilight', 'Ember',     'Shadow',  'Gloom',   'Murk',    'Haze']},
+]
+
+
+def _apply_league_theme(sim_teams: list) -> tuple[str, list]:
+    """
+    Pick a random theme, assign themed names to conference and division slots.
+    Returns (league_name, sim_teams_with_themed_names).
+    Conferences get the first 2 shuffled members; divisions get the remaining 4,
+    assigned in the order (conf0/div0, conf0/div1, conf1/div0, conf1/div1).
+    """
+    theme   = random.choice(_THEME_FAMILIES)
+    members = list(theme['members'])
+    random.shuffle(members)
+
+    # Collect unique (conference, division) pairs in encounter order
+    conf_order: list[str] = []
+    div_order:  list[tuple[str, str]] = []
+    for t in sim_teams:
+        if t['conference'] not in conf_order:
+            conf_order.append(t['conference'])
+        key = (t['conference'], t['division'])
+        if key not in div_order:
+            div_order.append(key)
+
+    conf_map = {old: members[i]         for i, old in enumerate(conf_order)}
+    div_map  = {key: members[2 + i]     for i, key in enumerate(div_order)}
+
+    themed = [
+        {**t,
+         'conference': conf_map[t['conference']],
+         'division':   div_map[(t['conference'], t['division'])]}
+        for t in sim_teams
+    ]
+    return f"{theme['league']} League", themed
+
+
+# ============================================================
 # WEEK ASSIGNMENT
 # ============================================================
 
@@ -60,13 +111,14 @@ def _assign_weeks(schedule: list[tuple], n_weeks: int = REGULAR_SEASON_WEEKS) ->
 # ============================================================
 
 async def create_league(db: AsyncSession, name: str) -> League:
-    league = League(name=name)
-    db.add(league)
-    await db.flush()
-
     pool      = generate_pool()
     sim_teams = build_teams()
     sim_teams, fa_pool = run_draft(sim_teams, pool, show_rounds=0)
+
+    league_name, sim_teams = _apply_league_theme(sim_teams)
+    league = League(name=league_name)
+    db.add(league)
+    await db.flush()
 
     team_idx_to_db: dict[int, Team] = {}
     for idx, sim_team in enumerate(sim_teams):
