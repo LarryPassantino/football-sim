@@ -737,6 +737,7 @@ def _board_draft_pick(
     available: list,
     position_priority: list[str | None],
     positions_filled: set[str],
+    player_ranking: list[str] | None = None,
 ) -> tuple['Player | None', str | None]:
     """
     Pick using the coach's draft board.
