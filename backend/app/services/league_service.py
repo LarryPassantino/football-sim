@@ -395,6 +395,10 @@ async def _notify_game_result(db: AsyncSession, game: Game) -> None:
 
 
 async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
+    # CPU roster moves run at the start of each week so human coaches get
+    # first access to FAs after the previous week's injuries resolved.
+    await run_cpu_roster_moves(db, season)
+
     result = await db.execute(
         select(Game)
         .where(Game.season_id == season.id, Game.week == season.current_week)
@@ -419,8 +423,6 @@ async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
         game.away_team.def_gameplan = 'balanced'
         await _notify_game_result(db, game)
 
-    await run_cpu_roster_moves(db, season)
-
     season.current_week += 1
 
     if season.current_week > REGULAR_SEASON_WEEKS:
@@ -444,6 +446,8 @@ async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
 
 
 async def _advance_playoff_week(db: AsyncSession, season: Season) -> dict:
+    await run_cpu_roster_moves(db, season)
+
     games_remaining_map = {
         PLAYOFF_DIVISIONAL:   3,
         PLAYOFF_CONF_CHAMP:   2,
@@ -477,8 +481,6 @@ async def _advance_playoff_week(db: AsyncSession, season: Season) -> dict:
         game.away_team.off_gameplan = 'balanced'
         game.away_team.def_gameplan = 'balanced'
         await _notify_game_result(db, game)
-
-    await run_cpu_roster_moves(db, season)
 
     if season.current_week == PLAYOFF_DIVISIONAL:
         # Group by conference, create one conf championship game per conference
@@ -920,7 +922,16 @@ async def start_preseason(db: AsyncSession, league_id: uuid.UUID) -> None:
 
 
 async def end_preseason(db: AsyncSession, league_id: uuid.UUID) -> None:
-    """After the preseason window, start the regular season."""
+    """After the preseason window, run CPU roster cleanup then start the regular season."""
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    season = result.scalar_one()
+    await run_cpu_roster_moves(db, season)
+    await db.commit()
     await start_new_season(db, league_id)
 
 
