@@ -491,7 +491,10 @@ async def get_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Season).where(Season.league_id == league_id)
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
     )
     season = result.scalar_one_or_none()
     if not season:
@@ -629,7 +632,12 @@ async def get_game_matchup(
     home_players = [p for p in all_players if p.team_id == home_id]
     away_players = [p for p in all_players if p.team_id == away_id]
 
-    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
     season = result.scalar_one_or_none()
 
     records: dict[uuid.UUID, dict] = {
@@ -694,7 +702,12 @@ async def get_game_matchup(
 
 @router.get('/{league_id}/standings', response_model=StandingsResponse)
 async def get_standings(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
     season = result.scalar_one_or_none()
     if not season:
         raise HTTPException(status_code=404, detail='No season found')
@@ -770,7 +783,12 @@ async def get_player_stats(
     if not player:
         raise HTTPException(status_code=404, detail='Player not found')
 
-    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
     season = result.scalar_one_or_none()
 
     ytd: dict[str, int] = {f: 0 for f in _STAT_FIELDS}
@@ -1007,7 +1025,12 @@ async def get_team_news(
 
 @router.get('/{league_id}/leaders', response_model=LeagueLeadersResponse)
 async def get_league_leaders(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Season).where(Season.league_id == league_id))
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
     season = result.scalar_one_or_none()
     if not season:
         raise HTTPException(status_code=404, detail='No season found')
