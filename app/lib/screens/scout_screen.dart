@@ -562,37 +562,39 @@ class _SwapPickerDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('Drop a $position'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$position slot is full. Select a player to release to make room for $incoming.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: players.length,
-              itemBuilder: (_, i) {
-                final p = players[i];
-                final composite = (p['composite'] as num).toDouble();
-                return ListTile(
-                  dense: true,
-                  title: Text(p['name'] as String),
-                  subtitle: Text('Age ${p['age']}'),
-                  trailing: Text(
-                    composite.toStringAsFixed(1),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  onTap: () => Navigator.pop(context, p),
-                );
-              },
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$position slot is full. Select a player to release to make room for $incoming.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: players.length,
+                itemBuilder: (_, i) {
+                  final p = players[i];
+                  final composite = (p['composite'] as num).toDouble();
+                  return ListTile(
+                    dense: true,
+                    title: Text(p['name'] as String),
+                    subtitle: Text('Age ${p['age']}'),
+                    trailing: Text(
+                      composite.toStringAsFixed(1),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    onTap: () => Navigator.pop(context, p),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
