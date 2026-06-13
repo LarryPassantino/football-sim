@@ -306,7 +306,13 @@ async def sign_free_agent(
     )
     active_at_pos = result.scalar()
     if active_at_pos >= _POSITION_MAX_ACTIVE.get(player.position, 0):
-        raise HTTPException(status_code=409, detail=f'No open {player.position} slot on active roster')
+        if body.drop_player_id is None:
+            raise HTTPException(status_code=409, detail=f'No open {player.position} slot on active roster')
+        drop = await db.get(Player, body.drop_player_id)
+        if not drop or drop.team_id != team_id or drop.on_ir or drop.position != player.position:
+            raise HTTPException(status_code=400, detail=f'Must drop an active {player.position} to make room')
+        drop.team_id = None
+        drop.on_ir   = False
 
     player.team_id = team_id
     player.on_ir   = False

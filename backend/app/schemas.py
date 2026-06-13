@@ -150,7 +150,8 @@ class PlayerRosterItem(BaseModel):
 
 
 class SignFARequest(BaseModel):
-    player_id: uuid.UUID
+    player_id:      uuid.UUID
+    drop_player_id: uuid.UUID | None = None
 
 
 class ActivateRequest(BaseModel):

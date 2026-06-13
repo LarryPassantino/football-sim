@@ -273,6 +273,7 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
   String? _tradeError;
 
   Future<void> _signPlayer() async {
+    final auth = context.read<AuthProvider>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -290,7 +291,6 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
 
     setState(() { _signing = true; _error = null; });
     try {
-      final auth = context.read<AuthProvider>();
       final res = await http.post(
         Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.myTeamId}/sign-fa'),
         headers: {...auth.authHeaders, 'Content-Type': 'application/json'},
@@ -298,9 +298,68 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
       );
       if (res.statusCode == 204) {
         widget.onSigned();
+      } else if (res.statusCode == 409) {
+        setState(() { _signing = false; });
+        if (mounted) await _showSwapFlow();
       } else {
-        final msg = jsonDecode(res.body)['detail'] ?? 'Signing failed';
-        setState(() { _error = msg; _signing = false; });
+        final msg = (jsonDecode(res.body) as Map<String, dynamic>)['detail'] ?? 'Signing failed';
+        setState(() { _error = msg as String; _signing = false; });
+      }
+    } catch (e) {
+      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _signing = false; });
+    }
+  }
+
+  Future<void> _showSwapFlow() async {
+    setState(() { _signing = true; });
+    List<Map<String, dynamic>> roster;
+    try {
+      final auth = context.read<AuthProvider>();
+      final res = await http.get(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.myTeamId}/roster'),
+        headers: auth.authHeaders,
+      );
+      if (res.statusCode != 200) throw Exception('Failed to load roster');
+      roster = (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      setState(() { _error = 'Could not load roster for swap'; _signing = false; });
+      return;
+    }
+    setState(() { _signing = false; });
+
+    final atPos = roster
+        .where((p) =>
+            p['position'] == widget.player.position &&
+            !(p['on_ir'] as bool? ?? false))
+        .toList();
+
+    if (!mounted) return;
+    final drop = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _SwapPickerDialog(
+        incoming: widget.player.name,
+        position: widget.player.position,
+        players: atPos,
+      ),
+    );
+    if (drop == null || !mounted) return;
+
+    setState(() { _signing = true; });
+    try {
+      final auth = context.read<AuthProvider>();
+      final res = await http.post(
+        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/teams/${widget.myTeamId}/sign-fa'),
+        headers: {...auth.authHeaders, 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'player_id':      widget.player.id,
+          'drop_player_id': drop['id'],
+        }),
+      );
+      if (res.statusCode == 204) {
+        widget.onSigned();
+      } else {
+        final msg = (jsonDecode(res.body) as Map<String, dynamic>)['detail'] ?? 'Signing failed';
+        setState(() { _error = msg as String; _signing = false; });
       }
     } catch (e) {
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _signing = false; });
@@ -487,6 +546,61 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
     );
   }
 }
+
+class _SwapPickerDialog extends StatelessWidget {
+  final String incoming;
+  final String position;
+  final List<Map<String, dynamic>> players;
+
+  const _SwapPickerDialog({
+    required this.incoming,
+    required this.position,
+    required this.players,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Drop a $position'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$position slot is full. Select a player to release to make room for $incoming.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: players.length,
+              itemBuilder: (_, i) {
+                final p = players[i];
+                final composite = (p['composite'] as num).toDouble();
+                return ListTile(
+                  dense: true,
+                  title: Text(p['name'] as String),
+                  subtitle: Text('Age ${p['age']}'),
+                  trailing: Text(
+                    composite.toStringAsFixed(1),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onTap: () => Navigator.pop(context, p),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      ],
+    );
+  }
+}
+
 
 class _TradePickerDialog extends StatelessWidget {
   final List<Map<String, dynamic>> players;
