@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
 import 'game_detail_screen.dart';
+import 'history_screen.dart';
 import 'league_leaders_screen.dart';
 import 'matchup_screen.dart';
 import 'roster_screen.dart';
@@ -391,6 +392,21 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                 leagueId: leagueId,
                 title: 'Free Agents',
                 myTeamId: auth.teamId!,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.history),
+          label: const Text('Team History'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => HistoryScreen(
+                leagueId: leagueId,
+                teamId: auth.teamId!,
+                teamName: auth.teamName ?? 'My Team',
               ),
             ),
           ),

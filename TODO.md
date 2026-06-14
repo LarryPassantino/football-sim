@@ -19,7 +19,7 @@
 ## Engagement
 - [x] Game plan — weekly OFF/DEF setting (Balanced / Run Focus / Pass Focus; Balanced / Run Stop / Pass Rush); resets to Balanced each week advance so user must actively choose; set on the matchup screen pre-game; sim reads it and applies play-call probability + stat modifiers; CPU teams get a plan too (random or composite-based)
 - [x] Team news feed — single current-week headline computed on the fly from live data (no DB table); sources: last result, W/L streak, playoff position, injuries, star player performance; shown on team home screen above or within the alerts card
-- [ ] Team news — playoff spectator mode: once a team is eliminated, news slot shows league-wide playoff coverage (conference championship matchup previews → league championship preview → champion announcement); both conferences shown regardless of which conference your team is in
+- [x] Team news — playoff spectator mode: once a team is eliminated, news slot shows league-wide playoff coverage (conference championship matchup previews → league championship preview → champion announcement); both conferences shown regardless of which conference your team is in
 - [x] Push notification on game simmed — fires from cron immediately after the human coach's game resolves; message: "Your [team] just [won/lost/tied] [score] against [opponent]. Open the app to see the box score."
 
 ## Polish

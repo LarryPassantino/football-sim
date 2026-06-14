@@ -17,8 +17,8 @@ from ..schemas import (
     LeagueAvailableItem, LeagueCreateRequest, LeagueDetailResponse, LeagueLeadersResponse,
     LeagueResponse, PassingLeader, PlayerRosterItem, PlayerScoutItem, PlayerStatLine,
     PlayerStatsResponse, ReceivingLeader, ReleaseRequest, ReleaseResponse, RushingLeader,
-    SignFARequest, StandingRow, StandingsResponse, TeamMatchupSide, TeamNewsResponse,
-    TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
+    SignFARequest, StandingRow, StandingsResponse, TeamHistoryResponse, TeamMatchupSide,
+    TeamNewsResponse, TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
 )
 from ..services.league_service import (
     create_league, OFFSEASON_DAYS, PRESEASON_DAYS,
@@ -1027,6 +1027,73 @@ async def get_team_news(
     top_priority = max(p for p, _ in candidates)
     top = [h for p, h in candidates if p == top_priority]
     return TeamNewsResponse(headline=random.choice(top))
+
+
+@router.get('/{league_id}/teams/{team_id}/history', response_model=TeamHistoryResponse)
+async def get_team_history(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    db:        AsyncSession = Depends(get_db),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id:
+        raise HTTPException(status_code=404, detail='Team not found')
+
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id, Season.status == SeasonStatus.complete)
+        .order_by(Season.season_number.asc())
+    )
+    seasons = result.scalars().all()
+
+    entries = []
+    for season in seasons:
+        result = await db.execute(
+            select(Game)
+            .where(
+                Game.season_id == season.id,
+                Game.status    == GameStatus.complete,
+                or_(Game.home_team_id == team_id, Game.away_team_id == team_id),
+            )
+        )
+        games = result.scalars().all()
+
+        wins = losses = ties = 0
+        made_playoffs = False
+        playoff_wins  = 0
+
+        for g in games:
+            is_home   = g.home_team_id == team_id
+            my_score  = g.home_score if is_home else g.away_score
+            opp_score = g.away_score if is_home else g.home_score
+            if g.is_playoff:
+                made_playoffs = True
+                if my_score is not None and opp_score is not None and my_score > opp_score:
+                    playoff_wins += 1
+            else:
+                if my_score is None or opp_score is None:
+                    continue
+                if my_score > opp_score:
+                    wins += 1
+                elif my_score < opp_score:
+                    losses += 1
+                else:
+                    ties += 1
+
+        if not made_playoffs:
+            playoff_result = 'missed'
+        elif playoff_wins == 0:
+            playoff_result = 'first_round'
+        elif playoff_wins == 1:
+            playoff_result = 'conf_champ'
+        elif playoff_wins == 2:
+            playoff_result = 'runner_up'
+        else:
+            playoff_result = 'champion'
+
+        entries.append({'season_number': season.season_number, 'wins': wins, 'losses': losses, 'ties': ties, 'playoff_result': playoff_result})
+
+    return TeamHistoryResponse(team_id=team_id, team_name=team.name, seasons=entries)
 
 
 @router.get('/{league_id}/leaders', response_model=LeagueLeadersResponse)

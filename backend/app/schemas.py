@@ -309,6 +309,20 @@ class TeamNewsResponse(BaseModel):
     headline: str
 
 
+class TeamSeasonSummary(BaseModel):
+    season_number:  int
+    wins:           int
+    losses:         int
+    ties:           int
+    playoff_result: str  # missed | first_round | conf_champ | runner_up | champion
+
+
+class TeamHistoryResponse(BaseModel):
+    team_id:   uuid.UUID
+    team_name: str
+    seasons:   list[TeamSeasonSummary]
+
+
 class CoachTeamItem(BaseModel):
     team_id:    uuid.UUID
     team_name:  str
