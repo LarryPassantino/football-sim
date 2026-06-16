@@ -82,9 +82,10 @@ def _apply_league_theme(sim_teams: list) -> tuple[str, list]:
 # ============================================================
 
 def _assign_weeks(schedule: list[tuple], n_weeks: int = REGULAR_SEASON_WEEKS) -> dict[int, list[tuple]]:
-    """Assign each game to a week. Retries with a fresh shuffle if any game can't be placed."""
+    """Assign each game to a week with even distribution. Retries with a fresh shuffle if any game can't be placed."""
     games = list(schedule)
-    for _ in range(50):
+    games_per_week = len(games) // n_weeks  # 8 for standard 16-team, 17-week season
+    for _ in range(200):
         random.shuffle(games)
         weeks: dict[int, list] = {w: [] for w in range(1, n_weeks + 1)}
         teams_per_week: dict[int, set] = {w: set() for w in range(1, n_weeks + 1)}
@@ -92,7 +93,9 @@ def _assign_weeks(schedule: list[tuple], n_weeks: int = REGULAR_SEASON_WEEKS) ->
         for h_idx, a_idx in games:
             placed = False
             for w in range(1, n_weeks + 1):
-                if h_idx not in teams_per_week[w] and a_idx not in teams_per_week[w]:
+                if (len(weeks[w]) < games_per_week
+                        and h_idx not in teams_per_week[w]
+                        and a_idx not in teams_per_week[w]):
                     weeks[w].append((h_idx, a_idx))
                     teams_per_week[w].add(h_idx)
                     teams_per_week[w].add(a_idx)

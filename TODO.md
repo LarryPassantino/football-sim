@@ -9,7 +9,7 @@
 - [x] League leaders — split Defense into sub-sections (Tackles / Sacks / Interceptions) instead of single tackles-sorted list
 - [ ] Trade — "Offer for Trade" from own roster (stub exists in player detail sheet on RosterScreen)
 - [ ] Trade — n-for-n trades (post-v1)
-- [ ] Team history view — season-by-season W/L record tied to team_id, survives name changes
+- [x] Team history view — season-by-season W/L record tied to team_id, survives name changes
 - [x] Team names unique per league (validation on rename + league creation)
 - [x] Scoring play log — requires sim changes to record plays in sequence + new DB table; natural companion to game detail screen
 
