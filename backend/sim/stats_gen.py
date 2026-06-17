@@ -88,15 +88,15 @@ def generate_game_stats(
     raw_pass   = int(random.gauss(270 - run_factor * 30, 55) + (tds - 2.5) * 18 - turnovers * 12)
     pass_yards = max(20, raw_pass - sack_count * 7)
 
-    rush_yards = max(15, int(random.gauss(115 + run_factor * 20, 32)))
+    rush_yards = max(15, int(random.gauss(125 + run_factor * 20, 40)))
 
-    # Receiving yard split: WR 65%, TE 20%, RB 15%
-    wr_yards = round(pass_yards * 0.65)
+    # Receiving yard split: WR 68%, TE 20%, RB 12%
+    wr_yards = round(pass_yards * 0.68)
     te_yards = round(pass_yards * 0.20)
     rb_yards = pass_yards - wr_yards - te_yards
 
-    # Rush yard split: RB 82%, QB scrambles 18%
-    rb_rush = round(rush_yards * 0.82)
+    # Rush yard split: RB 85%, QB scrambles 15%
+    rb_rush = round(rush_yards * 0.85)
     qb_rush = rush_yards - rb_rush
 
     # Receptions per group (approximate yards/catch)
@@ -108,7 +108,7 @@ def generate_game_stats(
     # ==================== OFFENSE ====================
 
     qbs = ro.get('QB', [])
-    wrs = ro.get('WR', [])[:4]
+    wrs = ro.get('WR', [])[:3]
     tes = ro.get('TE', [])[:2]
     rbs = ro.get('RB', [])[:2]
     ols = ro.get('OL', [])
@@ -129,11 +129,11 @@ def generate_game_stats(
             off[qb['_db_id']]['rush_tds'] = 1
             rush_tds -= 1
 
-    # WRs — receiving (power=2.0 concentrates yards on the top receiver realistically)
+    # WRs — receiving (power=3.0 concentrates yards on the top receiver realistically)
     if wrs:
-        for pid, val in _distribute(wrs, wr_yards, power=2.0).items():
+        for pid, val in _distribute(wrs, wr_yards, power=3.0).items():
             off[pid]['receiving_yards'] += val
-        for pid, val in _distribute(wrs, wr_recs, power=2.0).items():
+        for pid, val in _distribute(wrs, wr_recs, power=3.0).items():
             off[pid]['receptions'] += val
 
     # TEs — receiving
@@ -143,12 +143,12 @@ def generate_game_stats(
         for pid, val in _distribute(tes, te_recs).items():
             off[pid]['receptions'] += val
 
-    # RBs — rushing + receiving (power=2.0 so starter gets workhorse share)
+    # RBs — rushing + receiving (power=3.0 so starter gets workhorse share)
     if rbs:
         rush_att = max(5, round(rb_rush / max(1, random.gauss(4.2, 0.7))))
-        for pid, val in _distribute(rbs, rb_rush, power=2.0).items():
+        for pid, val in _distribute(rbs, rb_rush, power=3.0).items():
             off[pid]['rush_yards'] += val
-        for pid, val in _distribute(rbs, rush_att, power=2.0).items():
+        for pid, val in _distribute(rbs, rush_att, power=3.0).items():
             off[pid]['rush_attempts'] += val
         for pid, val in _distribute(rbs, rb_yards, power=2.0).items():
             off[pid]['receiving_yards'] += val
