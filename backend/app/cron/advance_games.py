@@ -26,7 +26,6 @@ from ..services.league_service import (
     advance_week,
     end_preseason,
     generate_annual_draft_class,
-    repair_season_schedule,
     run_full_draft,
 )
 from sqlalchemy import select
@@ -34,15 +33,6 @@ from sqlalchemy import select
 
 async def main():
     async with SessionLocal() as db:
-        # ── ONE-TIME: repair dropped games from _assign_weeks bug ───────────
-        result = await db.execute(
-            select(League).where(League.status == LeagueStatus.regular)
-        )
-        for league in result.scalars().all():
-            summary = await repair_season_schedule(db, league.id)
-            print(f"[{league.name}] schedule repair: {summary}")
-        await db.commit()
-
         # ── Regular season and playoff advancement ──────────────────────────
         result = await db.execute(
             select(League).where(
