@@ -285,6 +285,34 @@ _POSITION_MAX_ACTIVE = {
 }
 
 
+_FA_MINIMUM = 2  # per position, per league
+
+
+async def _ensure_fa_minimums(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """Generate new players for any position with fewer than _FA_MINIMUM free agents."""
+    for pos in ROSTER_SLOTS:
+        result = await db.execute(
+            select(func.count()).where(
+                Player.league_id == league_id,
+                Player.team_id.is_(None),
+                Player.position  == pos,
+            )
+        )
+        fa_count = result.scalar()
+        for _ in range(_FA_MINIMUM - fa_count):
+            p = generate_player(pos)
+            db.add(Player(
+                league_id=league_id,
+                team_id=None,
+                name=p['name'],
+                position=pos,
+                age=p['age'],
+                stats=p['stats'],
+                composite=p['composite'],
+                potential=p['potential'],
+            ))
+
+
 async def run_cpu_roster_moves(db: AsyncSession, season: Season) -> None:
     """
     After each game tick, CPU teams:
@@ -358,6 +386,8 @@ async def run_cpu_roster_moves(db: AsyncSession, season: Season) -> None:
             if fa:
                 fa.team_id = team.id
                 fa.on_ir   = False
+
+    await _ensure_fa_minimums(db, league_id)
 
 
 # ============================================================
