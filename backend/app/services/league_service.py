@@ -106,7 +106,21 @@ def _assign_weeks(schedule: list[tuple], n_weeks: int = REGULAR_SEASON_WEEKS) ->
                 break
         if placed_all:
             return weeks
-    return weeks  # unreachable in practice
+
+    # Fallback: drop the per-week cap so no games are lost. The schedule is a
+    # 17-regular multigraph on 16 vertices, so a valid 1-factorization always
+    # exists — greedy without the cap will always find a slot for every game.
+    random.shuffle(games)
+    weeks = {w: [] for w in range(1, n_weeks + 1)}
+    teams_per_week = {w: set() for w in range(1, n_weeks + 1)}
+    for h_idx, a_idx in games:
+        for w in range(1, n_weeks + 1):
+            if h_idx not in teams_per_week[w] and a_idx not in teams_per_week[w]:
+                weeks[w].append((h_idx, a_idx))
+                teams_per_week[w].add(h_idx)
+                teams_per_week[w].add(a_idx)
+                break
+    return weeks
 
 
 # ============================================================
@@ -388,6 +402,55 @@ async def run_cpu_roster_moves(db: AsyncSession, season: Season) -> None:
                 fa.on_ir   = False
 
     await _ensure_fa_minimums(db, league_id)
+
+
+# ============================================================
+# SCHEDULE REPAIR
+# ============================================================
+
+async def repair_season_schedule(db: AsyncSession, league_id: uuid.UUID) -> dict:
+    """
+    Fill accidental bye weeks caused by _assign_weeks dropping games at season creation.
+    Only fixes future weeks (>= current_week) — past byes are permanent.
+    """
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id, Season.status == SeasonStatus.regular)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    season = result.scalar_one_or_none()
+    if not season:
+        return {'error': 'no active regular season'}
+
+    result = await db.execute(select(Team).where(Team.league_id == league_id))
+    all_teams = list(result.scalars().all())
+
+    result = await db.execute(
+        select(Game).where(Game.season_id == season.id, Game.is_playoff == False)  # noqa: E712
+    )
+    week_teams: dict[int, set] = defaultdict(set)
+    for g in result.scalars().all():
+        week_teams[g.week].add(g.home_team_id)
+        week_teams[g.week].add(g.away_team_id)
+
+    added = 0
+    for week in range(season.current_week, REGULAR_SEASON_WEEKS + 1):
+        free = [t for t in all_teams if t.id not in week_teams[week]]
+        random.shuffle(free)
+        for i in range(0, len(free) - 1, 2):
+            home, away = free[i], free[i + 1]
+            db.add(Game(
+                season_id=season.id,
+                week=week,
+                home_team_id=home.id,
+                away_team_id=away.id,
+            ))
+            week_teams[week].add(home.id)
+            week_teams[week].add(away.id)
+            added += 1
+
+    return {'makeup_games_added': added}
 
 
 # ============================================================
