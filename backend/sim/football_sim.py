@@ -192,6 +192,8 @@ def group_composite(starters, backup=None):
     then apply 80/20 split with the backup.
     No backup (K, P) returns starter average directly.
     """
+    if not starters:
+        return 0
     starter_avg = sum(player_composite(p) for p in starters) / len(starters)
     if backup is None:
         return starter_avg
