@@ -13,6 +13,7 @@ import 'draft_screen.dart';
 import 'schedule_screen.dart';
 import 'scout_screen.dart';
 import 'standings_screen.dart';
+import 'transactions_screen.dart';
 
 class _LeagueDetail {
   final String name;
@@ -408,6 +409,17 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                 teamId: auth.teamId!,
                 teamName: auth.teamName ?? 'My Team',
               ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.receipt_long),
+          label: const Text('Transactions'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TransactionsScreen(leagueId: leagueId),
             ),
           ),
         ),

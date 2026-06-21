@@ -32,6 +32,12 @@ class GameStatus(str, enum.Enum):
     complete  = 'complete'
 
 
+class TransactionType(str, enum.Enum):
+    sign    = 'sign'
+    release = 'release'
+    trade   = 'trade'
+
+
 def _now():
     return datetime.now(timezone.utc)
 
@@ -120,6 +126,21 @@ class Game(Base):
 
     home_team: Mapped['Team'] = relationship('Team', foreign_keys=[home_team_id], lazy='noload')
     away_team: Mapped['Team'] = relationship('Team', foreign_keys=[away_team_id], lazy='noload')
+
+
+class Transaction(Base):
+    __tablename__ = 'transactions'
+
+    id:                  Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    league_id:           Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), ForeignKey('leagues.id'), nullable=False)
+    season_id:           Mapped[uuid.UUID|None] = mapped_column(UUID(as_uuid=True), ForeignKey('seasons.id'), nullable=True)
+    tx_type:             Mapped[TransactionType]= mapped_column(nullable=False)
+    team_name:           Mapped[str]            = mapped_column(String(100), nullable=False)
+    player_name:         Mapped[str]            = mapped_column(String(100), nullable=False)
+    player_position:     Mapped[str]            = mapped_column(String(10), nullable=False)
+    other_team_name:     Mapped[str|None]       = mapped_column(String(100), nullable=True)
+    other_player_name:   Mapped[str|None]       = mapped_column(String(100), nullable=True)
+    created_at:          Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class PlayerGameStats(Base):

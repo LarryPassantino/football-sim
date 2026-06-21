@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..dependencies import get_current_coach, get_db
 from sim.player_gen import POSITION_STATS, assign_label
 from sqlalchemy import func
-from ..models import Coach, Game, GameStatus, League, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team
+from ..models import Coach, Game, GameStatus, League, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team, Transaction, TransactionType
 from ..schemas import (
     ActivateRequest, AvailableLeaguesResponse, DefenseLeader,
     GameDetailResponse, GameMatchupResponse, GamePlanRequest, GameResponse, GroupComposite,
@@ -19,6 +19,7 @@ from ..schemas import (
     PlayerStatsResponse, ReceivingLeader, ReleaseRequest, ReleaseResponse, RushingLeader,
     SignFARequest, StandingRow, StandingsResponse, TeamHistoryResponse, TeamMatchupSide,
     TeamNewsResponse, TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
+    TransactionItem,
 )
 from ..services.league_service import (
     create_league, OFFSEASON_DAYS, PRESEASON_DAYS,
@@ -27,6 +28,38 @@ from ..services.league_service import (
 )
 
 router = APIRouter(prefix='/leagues', tags=['leagues'])
+
+
+async def _current_season_id(db: AsyncSession, league_id: uuid.UUID) -> uuid.UUID | None:
+    result = await db.execute(
+        select(Season.id)
+        .where(Season.league_id == league_id, Season.status != SeasonStatus.complete)
+        .order_by(Season.created_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _write_tx(
+    db: AsyncSession,
+    league_id: uuid.UUID,
+    season_id: uuid.UUID | None,
+    tx_type: TransactionType,
+    team: Team,
+    player: Player,
+    other_team: Team | None = None,
+    other_player: Player | None = None,
+) -> None:
+    db.add(Transaction(
+        league_id=league_id,
+        season_id=season_id,
+        tx_type=tx_type,
+        team_name=team.name,
+        player_name=player.name,
+        player_position=player.position,
+        other_team_name=other_team.name if other_team else None,
+        other_player_name=other_player.name if other_player else None,
+    ))
 
 
 @router.get('/available', response_model=AvailableLeaguesResponse)
@@ -305,6 +338,7 @@ async def sign_free_agent(
         )
     )
     active_at_pos = result.scalar()
+    drop = None
     if active_at_pos >= _POSITION_MAX_ACTIVE.get(player.position, 0):
         if body.drop_player_id is None:
             raise HTTPException(status_code=409, detail=f'No open {player.position} slot on active roster')
@@ -316,6 +350,10 @@ async def sign_free_agent(
 
     player.team_id = team_id
     player.on_ir   = False
+    season_id = await _current_season_id(db, league_id)
+    await _write_tx(db, league_id, season_id, TransactionType.sign, team, player)
+    if drop is not None:
+        await _write_tx(db, league_id, season_id, TransactionType.release, team, drop)
     await db.commit()
 
 
@@ -410,6 +448,8 @@ async def release_player(
         if result.scalar() < max_count:
             thin.append(pos)
 
+    season_id = await _current_season_id(db, league_id)
+    await _write_tx(db, league_id, season_id, TransactionType.release, team, player)
     await db.commit()
     return ReleaseResponse(thin_positions=thin)
 
@@ -455,6 +495,8 @@ async def request_trade(
 
     my_player.team_id    = their_player.team_id
     their_player.team_id = team_id
+    season_id = await _current_season_id(db, league_id)
+    await _write_tx(db, league_id, season_id, TransactionType.trade, team, my_player, other_team=cpu_team, other_player=their_player)
     await db.commit()
     return TradeResponse(accepted=True, reason='Trade accepted')
 
@@ -1298,3 +1340,39 @@ async def set_draft_board(
     flag_modified(team, 'draft_board')
     await db.commit()
     return team.draft_board
+
+
+# ============================================================
+# TRANSACTION ENDPOINTS
+# ============================================================
+
+@router.get('/{league_id}/transactions', response_model=list[TransactionItem])
+async def get_transactions(
+    league_id: uuid.UUID,
+    coach:     Coach        = Depends(get_current_coach),
+    db:        AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Team).where(Team.league_id == league_id, Team.coach_id == coach.id)
+    )
+    _require_team_in_league(result.scalar_one_or_none())
+
+    season_id = await _current_season_id(db, league_id)
+    result = await db.execute(
+        select(Transaction)
+        .where(Transaction.league_id == league_id, Transaction.season_id == season_id)
+        .order_by(Transaction.created_at.desc())
+    )
+    txs = result.scalars().all()
+    return [
+        TransactionItem(
+            tx_type=t.tx_type.value,
+            team_name=t.team_name,
+            player_name=t.player_name,
+            player_position=t.player_position,
+            other_team_name=t.other_team_name,
+            other_player_name=t.other_player_name,
+            created_at=t.created_at.isoformat(),
+        )
+        for t in txs
+    ]

@@ -355,6 +355,16 @@ class DraftPickRecord(BaseModel):
     composite_label: str
 
 
+class TransactionItem(BaseModel):
+    tx_type:           str
+    team_name:         str
+    player_name:       str
+    player_position:   str
+    other_team_name:   str | None
+    other_player_name: str | None
+    created_at:        str
+
+
 class DraftStateResponse(BaseModel):
     is_done:           bool
     current_pick:      int
