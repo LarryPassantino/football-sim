@@ -1012,8 +1012,47 @@ async def get_team_news(
 
     # Playoff milestones
     played_playoff = any(g.is_playoff for g in completed)
-    if season.status == SeasonStatus.playoffs and not played_playoff:
+
+    # Determine if this team has any playoff game scheduled or played
+    team_in_playoffs = False
+    if season.status in (SeasonStatus.playoffs, SeasonStatus.complete):
+        _r = await db.execute(
+            select(func.count()).select_from(Game)
+            .where(
+                Game.season_id == season.id,
+                Game.is_playoff == True,  # noqa: E712
+                or_(Game.home_team_id == team_id, Game.away_team_id == team_id),
+            )
+        )
+        team_in_playoffs = (_r.scalar() or 0) > 0
+
+    if season.status == SeasonStatus.playoffs and team_in_playoffs and not played_playoff:
         candidates.append((2, f'{name} have punched their ticket to the playoffs!'))
+    elif season.status == SeasonStatus.playoffs and not team_in_playoffs:
+        # Spectator mode — show league-wide playoff coverage
+        _r = await db.execute(
+            select(Game)
+            .where(Game.season_id == season.id, Game.is_playoff == True, Game.status == GameStatus.complete)  # noqa: E712
+            .options(selectinload(Game.home_team), selectinload(Game.away_team))
+            .order_by(Game.week.desc())
+        )
+        _pf = _r.scalars().all()
+        if _pf:
+            _latest = max(g.week for g in _pf)
+            if _latest == PLAYOFF_LEAGUE_CHAMP:
+                _cg = next(g for g in _pf if g.week == PLAYOFF_LEAGUE_CHAMP)
+                _w = _cg.home_team if _cg.home_score > _cg.away_score else _cg.away_team
+                candidates.append((2, f'The {_w.name} are champions! {name} watches the celebration from home.'))
+            elif _latest == PLAYOFF_CONF_CHAMP:
+                _fin = [g.home_team if g.home_score > g.away_score else g.away_team for g in _pf if g.week == PLAYOFF_CONF_CHAMP]
+                if len(_fin) == 2:
+                    candidates.append((2, f'{_fin[0].name} and {_fin[1].name} will meet in the Championship Game.'))
+                elif len(_fin) == 1:
+                    candidates.append((2, f'{_fin[0].name} have advanced to the Championship Game.'))
+            elif _latest == PLAYOFF_DIVISIONAL:
+                candidates.append((2, f'The conference championships are set. {name} watches the playoffs from home.'))
+        else:
+            candidates.append((1, f"{name} missed the playoffs this year. Time to build for next season."))
     elif last.is_playoff:
         w = last.week
         if   last_r == 'W' and w == PLAYOFF_LEAGUE_CHAMP:
@@ -1028,6 +1067,18 @@ async def get_team_news(
             candidates.append((2, f'{name} keep the championship dream alive with a first-round win.'))
         elif last_r == 'L' and w == PLAYOFF_DIVISIONAL:
             candidates.append((2, f"{name}'s season ends with a first-round playoff exit."))
+
+    # Post-season: show champion for teams that didn't make the playoffs
+    if season.status == SeasonStatus.complete and not team_in_playoffs:
+        _r = await db.execute(
+            select(Game)
+            .where(Game.season_id == season.id, Game.week == PLAYOFF_LEAGUE_CHAMP, Game.status == GameStatus.complete)  # noqa: E712
+            .options(selectinload(Game.home_team), selectinload(Game.away_team))
+        )
+        _cg = _r.scalar_one_or_none()
+        if _cg:
+            _w = _cg.home_team if _cg.home_score > _cg.away_score else _cg.away_team
+            candidates.append((2, f'{_w.name} won the championship this season. Time to reload, {name}.'))
 
     # Streak
     if streak_count >= 3 and streak_type == 'W':
@@ -1357,7 +1408,13 @@ async def get_transactions(
     )
     _require_team_in_league(result.scalar_one_or_none())
 
-    season_id = await _current_season_id(db, league_id)
+    result = await db.execute(
+        select(Season.id)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    season_id = result.scalar_one_or_none()
     result = await db.execute(
         select(Transaction)
         .where(Transaction.league_id == league_id, Transaction.season_id == season_id)
