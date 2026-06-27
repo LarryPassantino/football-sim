@@ -25,7 +25,7 @@ from .sim_bridge import clear_all_injuries, play_game
 from .push_service import send_game_result
 
 REGULAR_SEASON_WEEKS = 17
-OFFSEASON_DAYS       = 4
+OFFSEASON_DAYS       = 3
 PLAYOFF_DIVISIONAL   = 18
 PLAYOFF_CONF_CHAMP   = 19
 PLAYOFF_LEAGUE_CHAMP = 20

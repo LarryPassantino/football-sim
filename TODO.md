@@ -1,7 +1,7 @@
 # Gridiron Empire — To-Do
 
 ## Up Next
-- [ ] Reduce OFFSEASON_DAYS from 4 to 3 (backend/app/services/league_service.py)
+- [x] Reduce OFFSEASON_DAYS from 4 to 3 (backend/app/services/league_service.py)
 - [x] Team rename — PATCH endpoint + UI on team home screen
 - [x] Season 2+ (no draft) — offseason → new season flow; clear old games, generate new schedule, reset week; players keep current rosters
 - [x] Draft system — annual draft class; 5 rounds, worst→best linear order; CPU auto-picks; human picks via Draft Room; undrafted go to FA pool (culled to 5/position after)
