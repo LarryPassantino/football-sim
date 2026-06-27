@@ -783,7 +783,12 @@ FA_MAX_PER_POSITION = {
 
 
 async def _draft_order_from_standings(db: AsyncSession, league_id: uuid.UUID) -> list[uuid.UUID]:
-    """Return team IDs worst→best from the most recently completed season."""
+    """
+    Return team IDs in draft order (worst pick first).
+    Non-playoff teams: sorted by regular-season record (worst first).
+    Playoff teams: grouped by elimination round (earlier exit = earlier pick),
+    sorted by record within each round. Champion picks last.
+    """
     result = await db.execute(
         select(Season)
         .where(Season.league_id == league_id, Season.status == SeasonStatus.complete)
@@ -796,9 +801,46 @@ async def _draft_order_from_standings(db: AsyncSession, league_id: uuid.UUID) ->
         return [t.id for t in result.scalars().all()]
 
     standings = await _get_standings(db, last)
-    ranked = sorted(standings.values(), key=cmp_to_key(_compare_teams))
-    ranked.reverse()  # sorted() is best→worst; flip for draft (worst picks first)
-    return [r['team_id'] for r in ranked]
+
+    # Determine playoff elimination round for each team
+    result = await db.execute(
+        select(Game).where(
+            Game.season_id  == last.id,
+            Game.is_playoff == True,   # noqa: E712
+            Game.status     == GameStatus.complete,
+        )
+    )
+    playoff_games = result.scalars().all()
+
+    eliminated_in: dict[uuid.UUID, int] = {}
+    champion_id:   uuid.UUID | None = None
+    for g in playoff_games:
+        winner_id = g.home_team_id if g.home_score > g.away_score else g.away_team_id
+        loser_id  = g.away_team_id if g.home_score > g.away_score else g.home_team_id
+        eliminated_in[loser_id] = g.week
+        if g.week == PLAYOFF_LEAGUE_CHAMP:
+            champion_id = winner_id
+
+    playoff_team_ids = set(eliminated_in) | ({champion_id} if champion_id else set())
+
+    def _sort_worst_first(team_ids: list) -> list[uuid.UUID]:
+        rows = [standings[tid] for tid in team_ids if tid in standings]
+        rows.sort(key=cmp_to_key(_compare_teams))  # best→worst
+        rows.reverse()                              # worst→best
+        return [r['team_id'] for r in rows]
+
+    non_playoff      = [r['team_id'] for r in standings.values() if r['team_id'] not in playoff_team_ids]
+    divisional_out   = [tid for tid, w in eliminated_in.items() if w == PLAYOFF_DIVISIONAL]
+    conf_out         = [tid for tid, w in eliminated_in.items() if w == PLAYOFF_CONF_CHAMP]
+    runner_up        = [tid for tid, w in eliminated_in.items() if w == PLAYOFF_LEAGUE_CHAMP]
+
+    return (
+        _sort_worst_first(non_playoff)
+        + _sort_worst_first(divisional_out)
+        + _sort_worst_first(conf_out)
+        + _sort_worst_first(runner_up)
+        + ([champion_id] if champion_id else [])
+    )
 
 
 async def generate_annual_draft_class(db: AsyncSession, league_id: uuid.UUID) -> None:
