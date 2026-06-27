@@ -24,9 +24,17 @@
 - [x] Team news — playoff spectator mode: once a team is eliminated, news slot shows league-wide playoff coverage (conference championship matchup previews → league championship preview → champion announcement); both conferences shown regardless of which conference your team is in
 - [x] Push notification on game simmed — fires from cron immediately after the human coach's game resolves; message: "Your [team] just [won/lost/tied] [score] against [opponent]. Open the app to see the box score."
 
+## Verify / Bugs (season 3)
+- [ ] Push notifications — not confirmed working end of season 2; verify a game notification fires this season
+- [ ] Playoff team news — spectator mode headlines may not have been showing correctly for eliminated teams
+- [ ] Transactions list — fixed: _current_season_id was filtering out complete seasons, writing NULL season_id during preseason; verify transactions appear this season
+
 ## Polish
 - [ ] Visual identity — team `color1` / `color2` fields for UI theming; player `jersey_number` field; requires DB migration
 - [ ] Push notifications — IR returns, season phase changes (expand scope once game-simmed notification is built)
+
+## Monetization
+- [ ] Monetization — free first league, paid additional leagues; payment flow TBD
 
 ## --POST LAUNCH-- Stats & History
 - [ ] --POST LAUNCH-- All-time league statistical leaders — season records for passing yards, rush yards, receiving yards, TDs, sacks, interceptions, etc.; powered by existing career_stats + retired player records

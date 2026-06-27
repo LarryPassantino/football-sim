@@ -33,8 +33,8 @@ router = APIRouter(prefix='/leagues', tags=['leagues'])
 async def _current_season_id(db: AsyncSession, league_id: uuid.UUID) -> uuid.UUID | None:
     result = await db.execute(
         select(Season.id)
-        .where(Season.league_id == league_id, Season.status != SeasonStatus.complete)
-        .order_by(Season.created_at.desc())
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
         .limit(1)
     )
     return result.scalar_one_or_none()
