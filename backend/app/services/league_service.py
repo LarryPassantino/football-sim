@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from sim.draft_sim import LEAGUE as LEAGUE_STRUCTURE, PICK_PRIORITY, build_teams, run_draft
-from sim.player_gen import generate_player, generate_pool, ROSTER_SLOTS
+from sim.player_gen import (
+    generate_player, generate_pool, ROSTER_SLOTS,
+    POSITION_STATS, WEIGHTS_3, WEIGHTS_6,
+    annual_composite_delta, fitness_modifier, retirement_probability,
+    _FA_DECLINE,
+)
 from sim.season_sim import build_schedule
 
 from ..models import (
@@ -310,6 +315,7 @@ async def _ensure_fa_minimums(db: AsyncSession, league_id: uuid.UUID) -> None:
                 Player.league_id == league_id,
                 Player.team_id.is_(None),
                 Player.position  == pos,
+                Player.retired   == False,  # noqa: E712
             )
         )
         fa_count = result.scalar()
@@ -392,6 +398,7 @@ async def run_cpu_roster_moves(db: AsyncSession, season: Season) -> None:
                     Player.league_id == league_id,
                     Player.team_id.is_(None),
                     Player.position  == pos,
+                    Player.retired   == False,  # noqa: E712
                 )
                 .order_by(Player.composite.desc())
                 .limit(1)
@@ -628,6 +635,46 @@ _STAT_FIELDS = [
 ]
 
 
+async def apply_aging(db: AsyncSession, league_id: uuid.UUID) -> None:
+    """Age all non-retired players, apply composite delta, retire where appropriate."""
+    result = await db.execute(
+        select(Player).where(
+            Player.league_id == league_id,
+            Player.retired   == False,  # noqa: E712
+        )
+    )
+    players = result.scalars().all()
+
+    for player in players:
+        is_fa   = player.team_id is None
+        weights = WEIGHTS_3 if player.position in ('K', 'P') else WEIGHTS_6
+
+        delta = (
+            annual_composite_delta(player.age)
+            + fitness_modifier(player.stats, player.position)
+            + random.gauss(0, 1.5)
+        )
+        if is_fa:
+            delta -= _FA_DECLINE
+
+        new_stats = [
+            max(30, min(95, int(round(s + delta + random.gauss(0, 1.0)))))
+            for s in player.stats
+        ]
+        new_composite = round(sum(s * w for s, w in zip(new_stats, weights)), 1)
+
+        if random.random() < retirement_probability(player.age + 1, new_composite):
+            player.retired = True
+            player.team_id = None
+            player.on_ir   = False
+        else:
+            player.age       = player.age + 1
+            player.stats     = list(new_stats)
+            player.composite = new_composite
+
+    await _ensure_fa_minimums(db, league_id)
+
+
 async def end_season(db: AsyncSession, league_id: uuid.UUID) -> None:
     """Accumulate season stats into career totals, clear injuries, move league to offseason."""
     result = await db.execute(select(League).where(League.id == league_id))
@@ -664,6 +711,7 @@ async def end_season(db: AsyncSession, league_id: uuid.UUID) -> None:
         season.completed_at = datetime.now(timezone.utc)
 
     await clear_all_injuries(db, league_id)
+    await apply_aging(db, league_id)
     league.status = LeagueStatus.offseason
     await db.commit()
 
@@ -997,7 +1045,12 @@ async def _finalize_draft(db: AsyncSession, league_id: uuid.UUID) -> None:
     for pos, cap in FA_MAX_PER_POSITION.items():
         result = await db.execute(
             select(Player)
-            .where(Player.league_id == league_id, Player.team_id == None, Player.position == pos)
+            .where(
+                Player.league_id == league_id,
+                Player.team_id.is_(None),
+                Player.position  == pos,
+                Player.retired   == False,  # noqa: E712
+            )
             .order_by(Player.composite.desc())
         )
         for excess in result.scalars().all()[cap:]:

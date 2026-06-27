@@ -299,7 +299,7 @@ async def scout_team(league_id: uuid.UUID, team_id: uuid.UUID, db: AsyncSession 
 async def get_free_agents(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Player)
-        .where(Player.league_id == league_id, Player.team_id.is_(None))
+        .where(Player.league_id == league_id, Player.team_id.is_(None), Player.retired == False)  # noqa: E712
         .order_by(Player.position)
     )
     items = _to_scout_items(result.scalars().all())
@@ -327,7 +327,7 @@ async def sign_free_agent(
         raise HTTPException(status_code=403, detail='Not your team')
 
     player = await db.get(Player, body.player_id)
-    if not player or player.league_id != league_id or player.team_id is not None:
+    if not player or player.league_id != league_id or player.team_id is not None or player.retired:
         raise HTTPException(status_code=404, detail='Player not available')
 
     result = await db.execute(

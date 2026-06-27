@@ -161,6 +161,44 @@ def age_modifier(age):
         return -(age - 28) * 2.2   # -4.4 at 30, -11.0 at 33
 
 
+_RETIRE_FLOOR  = 45.0
+_FA_DECLINE    = 1.0   # extra composite drop for FA players at season end
+_FITNESS_STATS = {'SPEED', 'STAMINA', 'AGILITY', 'STRENGTH'}
+
+
+def annual_composite_delta(age: int) -> float:
+    """Expected composite change when aging from `age` to `age + 1`."""
+    return age_modifier(age + 1) - age_modifier(age)
+
+
+def fitness_modifier(stats: list, position: str) -> float:
+    """
+    Small extra modifier based on physical fitness stats.
+    High-fitness players decay slightly slower; low-fitness slightly faster.
+    Range: approximately -0.8 to +0.8.
+    """
+    stat_names = POSITION_STATS[position]
+    vals = [v for n, v in zip(stat_names, stats) if n in _FITNESS_STATS]
+    if not vals:
+        return 0.0
+    return (sum(vals) / len(vals) - POOL_TALENT_MEAN) * 0.04
+
+
+def retirement_probability(age: int, composite: float) -> float:
+    """
+    Probability a player retires this offseason.
+    Hard floor at _RETIRE_FLOOR composite; probability curve starts at age 33.
+    Caps at 85% so the occasional iron-man survives.
+    """
+    if composite < _RETIRE_FLOOR:
+        return 1.0
+    if age < 33:
+        return 0.0
+    base = (age - 32) * 0.12     # 12% at 33, 24% at 34, 36% at 35 …
+    comp_mod = max(0.0, (60.0 - composite) * 0.01)
+    return min(0.85, base + comp_mod)
+
+
 # ============================================================
 # PLAYER GENERATION
 # ============================================================

@@ -1,6 +1,7 @@
 # Gridiron Empire — To-Do
 
 ## Up Next
+- [ ] Reduce OFFSEASON_DAYS from 4 to 3 (backend/app/services/league_service.py)
 - [x] Team rename — PATCH endpoint + UI on team home screen
 - [x] Season 2+ (no draft) — offseason → new season flow; clear old games, generate new schedule, reset week; players keep current rosters
 - [x] Draft system — annual draft class; 5 rounds, worst→best linear order; CPU auto-picks; human picks via Draft Room; undrafted go to FA pool (culled to 5/position after)
@@ -26,6 +27,9 @@
 - [ ] Visual identity — team `color1` / `color2` fields for UI theming; player `jersey_number` field; requires DB migration
 - [ ] Push notifications — IR returns, season phase changes (expand scope once game-simmed notification is built)
 
+## --POST LAUNCH-- Stats & History
+- [ ] --POST LAUNCH-- All-time league statistical leaders — season records for passing yards, rush yards, receiving yards, TDs, sacks, interceptions, etc.; powered by existing career_stats + retired player records
+
 ## --POST LAUNCH-- Draft & League
 - [ ] --POST LAUNCH-- Live draft — real-time snake draft session for private leagues; per-pick countdown timer; auto-pilot fallback from preference queue when timer expires; CPU teams auto-pick instantly; live and auto-pilot coaches coexist
 
@@ -38,7 +42,7 @@
 
 ## Long-term / v3
 - [x] Randomized league/conference/division names — pool of curated theme families (Storm, Celestial, Geological, Ocean, Fire, etc.), each with 6 names; at league creation pick one theme at random, assign 1 name to league, 2 to conferences, 4 to divisions (no repeats); conference and division names are thematic peers, not a strict hierarchy; pool is easy to extend; requires storing generated names on League/Team models
-- [ ] Aging, decline, and retirement — age curves, fitness-weighted stat decay, retirement threshold (floor ~45 composite)
+- [x] Aging, decline, and retirement — age curves, fitness-weighted stat decay, retirement threshold (floor ~45 composite)
 - [x] Annual draft class — smaller than season 1 pool (~60–70% size) to avoid FA pool inflation
-- [ ] FA pool management — roster-less decline: players in FA at end of season take an extra decline tick on top of normal age decay; players below composite floor retire out of the pool entirely; active signings by CPU + human drain mid-tier naturally
+- [x] FA pool management — roster-less decline: players in FA at end of season take an extra decline tick on top of normal age decay; players below composite floor retire out of the pool entirely; active signings by CPU + human drain mid-tier naturally
 - [ ] --POST LAUNCH-- Cross-League Championship — Champions League style; season winners enter a playoff pool every 2–3 months, set starters, sim only
