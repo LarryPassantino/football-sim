@@ -25,18 +25,18 @@ GROUP_BONUS_STD = 5
 # ============================================================
 
 LABEL_RANGES = [
-    (83, 95, 'Elite'),
-    (73, 82, 'Above Avg'),
-    (63, 72, 'Average'),
-    (50, 62, 'Below Avg'),
-    (30, 49, 'Weak'),
+    (83, 'Elite'),
+    (73, 'Above Avg'),
+    (63, 'Average'),
+    (50, 'Below Avg'),
+    (30, 'Weak'),
 ]
 
-def assign_label(value):
-    for lo, hi, label in LABEL_RANGES:
-        if lo <= value <= hi:
+def assign_label(value: float) -> str:
+    for threshold, label in LABEL_RANGES:
+        if value >= threshold:
             return label
-    return 'Weak' if value < 50 else 'Elite'
+    return 'Weak'
 
 
 DRAFT_LABEL_MAP = {
@@ -286,7 +286,7 @@ def generate_pool(team_count=TEAM_COUNT, fa_buffer_pct=FA_BUFFER_PCT):
 
 def pool_summary(pool):
     """Distribution overview for the full generated pool."""
-    label_order = [lbl for _, _, lbl in LABEL_RANGES]
+    label_order = [lbl for _, lbl in LABEL_RANGES]
     total = 0
 
     print(f"\n{'='*65}")
