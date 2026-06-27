@@ -566,11 +566,11 @@ class _PlayerDetailSheetState extends State<_PlayerDetailSheet> {
               const SizedBox(height: 8),
               _statSummaryRow(context, 'Career', _career!, player.position),
             ],
-            const SizedBox(height: 24),
-            OutlinedButton(
-              onPressed: null,
-              child: const Text('Offer for Trade'),
-            ),
+            // const SizedBox(height: 24),
+            // OutlinedButton(
+            //   onPressed: null,
+            //   child: const Text('Offer for Trade'),
+            // ),
           ],
         );
       },
