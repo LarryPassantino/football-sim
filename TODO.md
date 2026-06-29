@@ -9,6 +9,7 @@
 ## Gameplay
 - [x] League leaders — split Defense into sub-sections (Tackles / Sacks / Interceptions) instead of single tackles-sorted list
 - [ ] Trade — player-for-player and n-for-n trades
+- [ ] --POST LAUNCH-- CPU roster moves — currently only fills open slots (injury-triggered); revisit proactive upgrades (release weak player, sign better FA) if CPU-heavy leagues need it
 - [ ] --POST LAUNCH-- Trade — "Offer for Trade" from own roster (button commented out on RosterScreen)
 - [ ] --POST LAUNCH-- Trade — trade for draft pick
 - [x] Team history view — season-by-season W/L record tied to team_id, survives name changes

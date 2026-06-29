@@ -333,6 +333,21 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
+          icon: const Icon(Icons.person_search),
+          label: const Text('Free Agents'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ScoutScreen(
+                leagueId: leagueId,
+                title: 'Free Agents',
+                myTeamId: auth.teamId!,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
           icon: const Icon(Icons.bar_chart),
           label: const Text('Standings'),
           onPressed: () => Navigator.push(
@@ -341,32 +356,6 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
               builder: (_) => StandingsScreen(
                 leagueId: leagueId,
                 myTeamId: auth.teamId!,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.leaderboard),
-          label: const Text('League Leaders'),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => LeagueLeadersScreen(leagueId: leagueId),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.calendar_today),
-          label: const Text('Full Schedule'),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ScheduleScreen(
-                leagueId: leagueId,
-                myTeamId: auth.teamId!,
-                initialWeek: _lastGame?.week ?? _league?.currentWeek,
               ),
             ),
           ),
@@ -384,16 +373,38 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         ],
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          icon: const Icon(Icons.person_search),
-          label: const Text('Free Agents'),
+          icon: const Icon(Icons.calendar_today),
+          label: const Text('Full Schedule'),
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ScoutScreen(
+              builder: (_) => ScheduleScreen(
                 leagueId: leagueId,
-                title: 'Free Agents',
                 myTeamId: auth.teamId!,
+                initialWeek: _lastGame?.week ?? _league?.currentWeek,
               ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.receipt_long),
+          label: const Text('Transactions'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TransactionsScreen(leagueId: leagueId),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.leaderboard),
+          label: const Text('League Leaders'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LeagueLeadersScreen(leagueId: leagueId),
             ),
           ),
         ),
@@ -409,17 +420,6 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                 teamId: auth.teamId!,
                 teamName: auth.teamName ?? 'My Team',
               ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.receipt_long),
-          label: const Text('Transactions'),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TransactionsScreen(leagueId: leagueId),
             ),
           ),
         ),
