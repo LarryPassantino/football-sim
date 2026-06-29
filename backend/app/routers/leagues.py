@@ -351,9 +351,8 @@ async def sign_free_agent(
     player.team_id = team_id
     player.on_ir   = False
     season_id = await _current_season_id(db, league_id)
-    await _write_tx(db, league_id, season_id, TransactionType.sign, team, player)
-    if drop is not None:
-        await _write_tx(db, league_id, season_id, TransactionType.release, team, drop)
+    await _write_tx(db, league_id, season_id, TransactionType.sign, team, player,
+                    other_player=drop if drop is not None else None)
     await db.commit()
 
 
@@ -397,6 +396,9 @@ async def activate_ir_player(
         drop.on_ir   = False
 
     activate.on_ir = False
+    season_id = await _current_season_id(db, league_id)
+    await _write_tx(db, league_id, season_id, TransactionType.activate, team, activate,
+                    other_player=drop if body.drop_player_id else None)
     await db.commit()
 
 

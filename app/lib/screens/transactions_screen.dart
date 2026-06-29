@@ -23,34 +23,47 @@ class _Tx {
         otherPlayerName  = j['other_player_name'] as String?,
         createdAt        = DateTime.parse(j['created_at'] as String).toLocal();
 
+  String get prefix {
+    switch (txType) {
+      case 'sign':
+        return otherPlayerName != null ? '+-' : '+';
+      case 'release':  return '-';
+      case 'activate':
+        return otherPlayerName != null ? '+-' : '+';
+      case 'trade':    return '~';
+      default:         return '~';
+    }
+  }
+
+  Color prefixColor(BuildContext context) {
+    switch (txType) {
+      case 'sign':
+        return otherPlayerName != null ? Colors.orange : Colors.green;
+      case 'release':  return Colors.red;
+      case 'activate':
+        return otherPlayerName != null ? Colors.orange : Colors.green;
+      default:         return Theme.of(context).colorScheme.primary;
+    }
+  }
+
   String get summary {
     switch (txType) {
       case 'sign':
-        return '$teamName picked up $playerName ($playerPosition)';
+        if (otherPlayerName != null) {
+          return '$teamName: signed $playerName, released $otherPlayerName ($playerPosition)';
+        }
+        return '$teamName signed $playerName ($playerPosition)';
       case 'release':
         return '$teamName released $playerName ($playerPosition)';
+      case 'activate':
+        if (otherPlayerName != null) {
+          return '$teamName: activated $playerName from IR, released $otherPlayerName ($playerPosition)';
+        }
+        return '$teamName activated $playerName from IR ($playerPosition)';
       case 'trade':
         return '$teamName traded $playerName ($playerPosition) to ${otherTeamName ?? '?'} for ${otherPlayerName ?? '?'}';
       default:
         return '$teamName — $playerName ($playerPosition)';
-    }
-  }
-
-  IconData get icon {
-    switch (txType) {
-      case 'sign':    return Icons.add_circle_outline;
-      case 'release': return Icons.remove_circle_outline;
-      case 'trade':   return Icons.swap_horiz;
-      default:        return Icons.swap_horiz;
-    }
-  }
-
-  Color iconColor(BuildContext context) {
-    switch (txType) {
-      case 'sign':    return Colors.green;
-      case 'release': return Colors.red;
-      case 'trade':   return Theme.of(context).colorScheme.primary;
-      default:        return Theme.of(context).colorScheme.outline;
     }
   }
 }
@@ -113,7 +126,19 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       itemBuilder: (context, i) {
                         final tx = _txs![i];
                         return ListTile(
-                          leading: Icon(tx.icon, color: tx.iconColor(context), size: 22),
+                          leading: SizedBox(
+                            width: 28,
+                            child: Center(
+                              child: Text(
+                                tx.prefix,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: tx.prefixColor(context),
+                                ),
+                              ),
+                            ),
+                          ),
                           title: Text(tx.summary, style: const TextStyle(fontSize: 13)),
                           subtitle: Text(
                             _formatDate(tx.createdAt),

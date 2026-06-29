@@ -33,9 +33,10 @@ class GameStatus(str, enum.Enum):
 
 
 class TransactionType(str, enum.Enum):
-    sign    = 'sign'
-    release = 'release'
-    trade   = 'trade'
+    sign     = 'sign'
+    release  = 'release'
+    trade    = 'trade'
+    activate = 'activate'
 
 
 def _now():
