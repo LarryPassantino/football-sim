@@ -84,48 +84,115 @@ def _apply_league_theme(sim_teams: list) -> tuple[str, list]:
 
 # ============================================================
 # WEEK ASSIGNMENT
+#
+# Splitting the season's games into weeks is a graph edge-coloring problem:
+# every team must appear exactly once per week (one game per week, no byes).
+# The old code did randomized greedy bin-packing with a fallback that could
+# SILENTLY DROP games it couldn't place. This version never drops a game — it
+# either produces a perfect schedule or rebuilds the matchups and tries again,
+# and a final validation pass guarantees correctness before it's ever persisted.
 # ============================================================
 
-def _assign_weeks(schedule: list[tuple], n_weeks: int = REGULAR_SEASON_WEEKS) -> dict[int, list[tuple]]:
-    """Assign each game to a week with even distribution. Retries with a fresh shuffle if any game can't be placed."""
-    games = list(schedule)
-    games_per_week = len(games) // n_weeks  # 8 for standard 16-team, 17-week season
-    for _ in range(200):
-        random.shuffle(games)
-        weeks: dict[int, list] = {w: [] for w in range(1, n_weeks + 1)}
-        teams_per_week: dict[int, set] = {w: set() for w in range(1, n_weeks + 1)}
-        placed_all = True
-        for h_idx, a_idx in games:
-            placed = False
-            for w in range(1, n_weeks + 1):
-                if (len(weeks[w]) < games_per_week
-                        and h_idx not in teams_per_week[w]
-                        and a_idx not in teams_per_week[w]):
-                    weeks[w].append((h_idx, a_idx))
-                    teams_per_week[w].add(h_idx)
-                    teams_per_week[w].add(a_idx)
-                    placed = True
-                    break
-            if not placed:
-                placed_all = False
+class ScheduleError(Exception):
+    """Raised when a set of matchups cannot be colored into a valid weekly schedule."""
+
+
+def _greedy_color(games: list[tuple], n_weeks: int, games_per_week: int) -> dict[int, list] | None:
+    """Fast path: one randomized greedy pass. Returns None if any game can't be placed."""
+    games = list(games)
+    random.shuffle(games)
+    weeks: dict[int, list] = {w: [] for w in range(1, n_weeks + 1)}
+    booked: dict[int, set] = {w: set() for w in range(1, n_weeks + 1)}
+    for h, a in games:
+        for w in range(1, n_weeks + 1):
+            if len(weeks[w]) < games_per_week and h not in booked[w] and a not in booked[w]:
+                weeks[w].append((h, a))
+                booked[w].add(h)
+                booked[w].add(a)
                 break
-        if placed_all:
+        else:
+            return None  # no legal week for this game — this arrangement failed
+    return weeks
+
+
+def _backtrack_color(games: list[tuple], n_weeks: int, games_per_week: int,
+                     budget: int = 2_000_000) -> dict[int, list] | None:
+    """
+    Guaranteed path: complete backtracking search. If any valid coloring exists
+    it will be found (within the node budget). Returns None only if the matchup
+    set is genuinely un-colorable (or the budget is exhausted) — the caller then
+    rebuilds the matchups. Parallel games (division home-and-home) are grouped
+    adjacently so the tight constraints prune the search early, and empty weeks
+    are treated as interchangeable to kill symmetric branches.
+    """
+    games = sorted(games, key=lambda g: (min(g), max(g)))
+    weeks: dict[int, list] = {w: [] for w in range(1, n_weeks + 1)}
+    booked: dict[int, set] = {w: set() for w in range(1, n_weeks + 1)}
+    nodes = [budget]
+
+    def place(i: int, opened: int) -> bool:
+        if i == len(games):
+            return True
+        if nodes[0] <= 0:
+            return False
+        nodes[0] -= 1
+        h, a = games[i]
+        limit = min(opened + 1, n_weeks)  # only one fresh (empty) week per step
+        for w in range(1, limit + 1):
+            if len(weeks[w]) < games_per_week and h not in booked[w] and a not in booked[w]:
+                weeks[w].append((h, a))
+                booked[w].add(h)
+                booked[w].add(a)
+                if place(i + 1, max(opened, w)):
+                    return True
+                weeks[w].pop()
+                booked[w].discard(h)
+                booked[w].discard(a)
+        return False
+
+    return weeks if place(0, 0) else None
+
+
+def _validate_weeks(weeks: dict[int, list], n_teams: int, n_weeks: int, games_per_week: int) -> None:
+    """Hard guarantee: every week is full, no team plays twice, every team plays every week."""
+    played: dict[int, int] = defaultdict(int)
+    for w in range(1, n_weeks + 1):
+        assert len(weeks[w]) == games_per_week, f'week {w} has {len(weeks[w])} games, expected {games_per_week}'
+        seen: set = set()
+        for h, a in weeks[w]:
+            assert h not in seen and a not in seen, f'team plays twice in week {w}'
+            seen.add(h)
+            seen.add(a)
+            played[h] += 1
+            played[a] += 1
+    for t in range(n_teams):
+        assert played[t] == n_weeks, f'team {t} plays {played[t]} games, expected {n_weeks}'
+
+
+def _build_weekly_schedule(sim_teams: list, n_weeks: int = REGULAR_SEASON_WEEKS,
+                           max_regen: int = 50) -> dict[int, list[tuple]]:
+    """
+    Build a matchup set and color it into weeks, guaranteeing a full n_weeks-game
+    schedule with no dropped games. Rebuilds the matchups if a given arrangement
+    can't be colored. Raises ScheduleError only if it exhausts every attempt.
+    """
+    for _ in range(max_regen):
+        schedule = build_schedule(sim_teams)
+        games_per_week = len(schedule) // n_weeks
+
+        weeks = None
+        for _ in range(200):                      # fast randomized greedy
+            weeks = _greedy_color(schedule, n_weeks, games_per_week)
+            if weeks is not None:
+                break
+        if weeks is None:                          # complete search fallback
+            weeks = _backtrack_color(schedule, n_weeks, games_per_week)
+
+        if weeks is not None:
+            _validate_weeks(weeks, len(sim_teams), n_weeks, games_per_week)
             return weeks
 
-    # Fallback: drop the per-week cap so no games are lost. The schedule is a
-    # 17-regular multigraph on 16 vertices, so a valid 1-factorization always
-    # exists — greedy without the cap will always find a slot for every game.
-    random.shuffle(games)
-    weeks = {w: [] for w in range(1, n_weeks + 1)}
-    teams_per_week = {w: set() for w in range(1, n_weeks + 1)}
-    for h_idx, a_idx in games:
-        for w in range(1, n_weeks + 1):
-            if h_idx not in teams_per_week[w] and a_idx not in teams_per_week[w]:
-                weeks[w].append((h_idx, a_idx))
-                teams_per_week[w].add(h_idx)
-                teams_per_week[w].add(a_idx)
-                break
-    return weeks
+    raise ScheduleError(f'could not build a valid {n_weeks}-week schedule after {max_regen} attempts')
 
 
 # ============================================================
@@ -185,8 +252,7 @@ async def create_league(db: AsyncSession, name: str) -> League:
     db.add(season)
     await db.flush()
 
-    schedule = build_schedule(sim_teams)
-    weeks    = _assign_weeks(schedule)
+    weeks = _build_weekly_schedule(sim_teams)
 
     for week_num, games in weeks.items():
         for h_idx, a_idx in games:
@@ -748,8 +814,7 @@ async def start_new_season(db: AsyncSession, league_id: uuid.UUID) -> None:
     db.add(new_season)
     await db.flush()
 
-    schedule = build_schedule(sim_teams)
-    weeks    = _assign_weeks(schedule)
+    weeks = _build_weekly_schedule(sim_teams)
 
     for week_num, games in weeks.items():
         for h_idx, a_idx in games:
