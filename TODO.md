@@ -26,9 +26,9 @@
 - [x] Push notification on game simmed — fires from cron immediately after the human coach's game resolves; message: "Your [team] just [won/lost/tied] [score] against [opponent]. Open the app to see the box score."
 
 ## Verify / Bugs (season 3)
-- [ ] Push notifications — not confirmed working end of season 2; verify a game notification fires this season
+- [x] Push notifications — not confirmed working end of season 2; verify a game notification fires this season
 - [ ] Playoff team news — spectator mode headlines may not have been showing correctly for eliminated teams
-- [ ] Transactions list — fixed: _current_season_id was filtering out complete seasons, writing NULL season_id during preseason; verify transactions appear this season
+- [x] Transactions list — fixed: _current_season_id was filtering out complete seasons, writing NULL season_id during preseason; verify transactions appear this season
 
 ## Polish
 - [ ] Visual identity — team `color1` / `color2` fields for UI theming; player `jersey_number` field; requires DB migration

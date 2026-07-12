@@ -137,15 +137,18 @@ async def get_league(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     )
     latest_season = result.scalar_one_or_none()
 
+    # While a phase is still active, the next cron tick is what advances it, so the
+    # countdown should never read 0 ("happening now") — clamp to 1 ("tomorrow") until
+    # the cron actually flips the status. Timing of the cron then never matters.
     offseason_days_remaining = None
     if league.status == LeagueStatus.offseason and latest_season and latest_season.completed_at:
         elapsed = (datetime.now(timezone.utc) - latest_season.completed_at).days
-        offseason_days_remaining = max(0, OFFSEASON_DAYS - elapsed)
+        offseason_days_remaining = max(1, OFFSEASON_DAYS - elapsed)
 
     preseason_days_remaining = None
     if league.status == LeagueStatus.preseason and latest_season and latest_season.completed_at:
         elapsed = (datetime.now(timezone.utc) - latest_season.completed_at).days
-        preseason_days_remaining = max(0, OFFSEASON_DAYS + PRESEASON_DAYS - elapsed)
+        preseason_days_remaining = max(1, OFFSEASON_DAYS + PRESEASON_DAYS - elapsed)
 
     season_status = None
     if league.status == LeagueStatus.offseason:
@@ -504,16 +507,20 @@ async def request_trade(
 
 
 _LABEL_ORDER  = {'Elite': 0, 'Above Avg': 1, 'Average': 2, 'Below Avg': 3, 'Weak': 4}
-_FITNESS_STATS = frozenset({'AGILITY', 'STAMINA', 'STRENGTH'})
+# Fitness stats are shared across positions and always render at the bottom in a
+# fixed order, so their placement can't hint at what the engine values per position.
+_FITNESS_ORDER = ['SPEED', 'AGILITY', 'STAMINA', 'STRENGTH']
+_FITNESS_STATS = frozenset(_FITNESS_ORDER)
 
 
 def _reorder_stats(stat_names: list[str]) -> list[str]:
     if len(stat_names) <= 1:
         return list(stat_names)
-    skill = stat_names[0]
-    rest  = stat_names[1:]
-    return [skill] + sorted(s for s in rest if s not in _FITNESS_STATS) \
-                   + sorted(s for s in rest if s in _FITNESS_STATS)
+    skill   = stat_names[0]
+    rest    = stat_names[1:]
+    unique  = sorted(s for s in rest if s not in _FITNESS_STATS)
+    fitness = [s for s in _FITNESS_ORDER if s in rest]
+    return [skill] + unique + fitness
 
 
 def _to_scout_items(players) -> list[PlayerScoutItem]:
@@ -1028,7 +1035,24 @@ async def get_team_news(
         )
         team_in_playoffs = (_r.scalar() or 0) > 0
 
-    if season.status == SeasonStatus.playoffs and team_in_playoffs and not played_playoff:
+    if season.status == SeasonStatus.complete:
+        # Season's over: reveal the champion to everyone. This supersedes any stale
+        # elimination headline for a team whose own playoff run ended earlier.
+        _r = await db.execute(
+            select(Game)
+            .where(Game.season_id == season.id, Game.week == PLAYOFF_LEAGUE_CHAMP, Game.status == GameStatus.complete)  # noqa: E712
+            .options(selectinload(Game.home_team), selectinload(Game.away_team))
+        )
+        _cg = _r.scalar_one_or_none()
+        if _cg:
+            _w = _cg.home_team if _cg.home_score > _cg.away_score else _cg.away_team
+            if _w.id == team_id:
+                candidates.append((2, f'The {name} are CHAMPIONS! What a season to remember.'))
+            elif team_in_playoffs:
+                candidates.append((2, f'{_w.name} won it all. {name} made a playoff run but came up short — time to reload.'))
+            else:
+                candidates.append((2, f'{_w.name} won the championship this season. Time to reload, {name}.'))
+    elif season.status == SeasonStatus.playoffs and team_in_playoffs and not played_playoff:
         candidates.append((2, f'{name} have punched their ticket to the playoffs!'))
     elif season.status == SeasonStatus.playoffs and not team_in_playoffs:
         # Spectator mode — show league-wide playoff coverage
@@ -1069,18 +1093,6 @@ async def get_team_news(
             candidates.append((2, f'{name} keep the championship dream alive with a first-round win.'))
         elif last_r == 'L' and w == PLAYOFF_DIVISIONAL:
             candidates.append((2, f"{name}'s season ends with a first-round playoff exit."))
-
-    # Post-season: show champion for teams that didn't make the playoffs
-    if season.status == SeasonStatus.complete and not team_in_playoffs:
-        _r = await db.execute(
-            select(Game)
-            .where(Game.season_id == season.id, Game.week == PLAYOFF_LEAGUE_CHAMP, Game.status == GameStatus.complete)  # noqa: E712
-            .options(selectinload(Game.home_team), selectinload(Game.away_team))
-        )
-        _cg = _r.scalar_one_or_none()
-        if _cg:
-            _w = _cg.home_team if _cg.home_score > _cg.away_score else _cg.away_team
-            candidates.append((2, f'{_w.name} won the championship this season. Time to reload, {name}.'))
 
     # Streak
     if streak_count >= 3 and streak_type == 'W':
