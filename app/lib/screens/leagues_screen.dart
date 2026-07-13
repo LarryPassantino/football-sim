@@ -13,6 +13,7 @@ import 'draft_screen.dart';
 import 'schedule_screen.dart';
 import 'scout_screen.dart';
 import 'standings_screen.dart';
+import 'training_screen.dart';
 import 'transactions_screen.dart';
 
 class _LeagueDetail {
@@ -324,6 +325,21 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => RosterScreen(
+                leagueId: leagueId,
+                teamId: auth.teamId!,
+                teamName: auth.teamName ?? 'My Team',
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          icon: const Icon(Icons.fitness_center),
+          label: const Text('Training'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TrainingScreen(
                 leagueId: leagueId,
                 teamId: auth.teamId!,
                 teamName: auth.teamName ?? 'My Team',
