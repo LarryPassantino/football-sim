@@ -154,6 +154,44 @@ class SignFARequest(BaseModel):
     drop_player_id: uuid.UUID | None = None
 
 
+class TrainRequest(BaseModel):
+    player_id: uuid.UUID
+    points:    int
+
+
+class TrainingPlayerItem(BaseModel):
+    id:                     uuid.UUID
+    name:                   str
+    position:               str
+    age:                    int
+    composite:              float
+    named_stats:            dict[str, int]
+    train_sessions_used:    int
+    sessions_remaining:     int
+    trained_this_week:      bool
+    injury_games_remaining: int
+
+
+class TrainingStateResponse(BaseModel):
+    train_points:        int
+    current_week:        int
+    in_regular_season:   bool
+    sessions_per_player: int
+    players:             list[TrainingPlayerItem]
+
+
+class TrainResultResponse(BaseModel):
+    outcome:             str            # upgrade | decline | injury | none
+    message:             str
+    stat_changed:        str | None = None
+    delta:               int = 0
+    composite:           float
+    injury_games:        int = 0
+    train_points:        int            # team points remaining after this session
+    train_sessions_used: int            # this player's sessions used after this session
+    sessions_remaining:  int
+
+
 class ActivateRequest(BaseModel):
     drop_player_id:     uuid.UUID | None = None
     activate_player_id: uuid.UUID

@@ -16,6 +16,7 @@ from sim.player_gen import (
     _FA_DECLINE,
 )
 from sim.season_sim import build_schedule
+from sim.training_sim import resolve_training_session, attainable_ceiling
 
 from ..models import (
     Coach, Game, GameStatus, League, LeagueStatus,
@@ -29,6 +30,12 @@ OFFSEASON_DAYS       = 3
 PLAYOFF_DIVISIONAL   = 18
 PLAYOFF_CONF_CHAMP   = 19
 PLAYOFF_LEAGUE_CHAMP = 20
+
+# Training (v3 progression) — see training_and_potential.md
+TRAIN_POINTS_PER_CYCLE       = 3   # per team, replenished each regular-season week
+TRAIN_SESSIONS_PER_PLAYER    = 3   # per player, per season
+MAX_TRAIN_POINTS_PER_SESSION = 3   # a single session can hold at most this many points
+CPU_MAX_INTENSITY            = 2   # CPUs train at moderate intensity to limit self-injury
 
 
 # ============================================================
@@ -563,6 +570,65 @@ async def _notify_game_result(db: AsyncSession, game: Game) -> None:
         send_game_result(coach.fcm_token, team.name, my_score, opp_score, opponent)
 
 
+async def _cpu_train_team(db: AsyncSession, team: Team, season: Season) -> None:
+    """Spend a CPU team's weekly training points on its youngest, highest-headroom
+    players at moderate intensity. Mirrors the human rules: session cap, one session
+    per player per cycle, no training the injured."""
+    result = await db.execute(
+        select(Player).where(Player.team_id == team.id, Player.retired == False)  # noqa: E712
+    )
+    players = result.scalars().all()
+
+    def headroom(p):
+        return attainable_ceiling(p.age, p.potential) - p.composite
+
+    def eligible(p):
+        return (
+            p.injury_games_remaining == 0 and not p.on_ir
+            and p.train_sessions_used < TRAIN_SESSIONS_PER_PLAYER
+            and p.trained_in_week != season.current_week
+            and headroom(p) > 0
+        )
+
+    # Prefer high headroom, skew toward youth.
+    candidates = sorted(
+        (p for p in players if eligible(p)),
+        key=lambda p: headroom(p) * (1 + max(0, 27 - p.age) * 0.1),
+        reverse=True,
+    )
+
+    points = team.train_points
+    for p in candidates:
+        if points <= 0:
+            break
+        intensity = min(CPU_MAX_INTENSITY, points)
+        res = resolve_training_session(
+            stats=p.stats, composite=p.composite, potential=p.potential,
+            position=p.position, age=p.age, intensity=intensity,
+        )
+        p.stats     = list(res.stats)
+        p.composite = res.composite
+        if res.outcome == 'injury':
+            p.injury_games_remaining = res.injury_games
+        p.train_sessions_used += 1
+        p.trained_in_week      = season.current_week
+        points -= intensity
+    team.train_points = points
+
+
+async def _open_training_cycle(db: AsyncSession, season: Season) -> None:
+    """Open a new regular-season training cycle: refresh every team's point budget
+    (use-it-or-lose-it) and let CPU teams spend theirs immediately. Human coaches
+    spend during the wait before the next game tick."""
+    result = await db.execute(select(Team).where(Team.league_id == season.league_id))
+    teams = result.scalars().all()
+    for team in teams:
+        team.train_points = TRAIN_POINTS_PER_CYCLE
+    for team in teams:
+        if team.is_cpu:
+            await _cpu_train_team(db, team, season)
+
+
 async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
     # CPU roster moves run at the start of each week so human coaches get
     # first access to FAs after the previous week's injuries resolved.
@@ -609,6 +675,9 @@ async def _advance_regular_week(db: AsyncSession, season: Season) -> dict:
                         is_playoff=True))
 
         season.status = SeasonStatus.playoffs
+    else:
+        # New regular-season cycle opens: refresh training budgets and let CPUs develop.
+        await _open_training_cycle(db, season)
 
     await db.commit()
     return {'week_played': season.current_week - 1, 'games': len(games)}
@@ -729,6 +798,14 @@ async def apply_aging(db: AsyncSession, league_id: uuid.UUID) -> None:
         ]
         new_composite = round(sum(s * w for s, w in zip(new_stats, weights)), 1)
 
+        # Natural growth carries a player toward — never past — his potential.
+        # Weights sum to 1.0, so shaving the overshoot off every stat lands
+        # composite at potential. (Decline never triggers this branch.)
+        if new_composite > player.potential:
+            overshoot = new_composite - player.potential
+            new_stats = [max(30, int(round(s - overshoot))) for s in new_stats]
+            new_composite = round(sum(s * w for s, w in zip(new_stats, weights)), 1)
+
         if random.random() < retirement_probability(player.age + 1, new_composite):
             player.retired = True
             player.team_id = None
@@ -737,6 +814,8 @@ async def apply_aging(db: AsyncSession, league_id: uuid.UUID) -> None:
             player.age       = player.age + 1
             player.stats     = list(new_stats)
             player.composite = new_composite
+            player.train_sessions_used = 0   # fresh training sessions each season
+            player.trained_in_week     = 0
 
     await _ensure_fa_minimums(db, league_id)
 
@@ -802,6 +881,8 @@ async def start_new_season(db: AsyncSession, league_id: uuid.UUID) -> None:
         select(Team).where(Team.league_id == league_id).order_by(Team.id)
     )
     teams = result.scalars().all()
+    for t in teams:
+        t.train_points = TRAIN_POINTS_PER_CYCLE   # fresh weekly budget for the new season
 
     sim_teams      = [{'conference': t.conference, 'division': t.division} for t in teams]
     team_idx_to_id = {i: t.id for i, t in enumerate(teams)}

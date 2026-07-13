@@ -77,6 +77,7 @@ class Team(Base):
     off_gameplan: Mapped[str]            = mapped_column(String(20), default='balanced', server_default='balanced')
     def_gameplan: Mapped[str]            = mapped_column(String(20), default='balanced', server_default='balanced')
     draft_board:  Mapped[dict | None]    = mapped_column(JSONB, nullable=True)
+    train_points: Mapped[int]            = mapped_column(Integer, default=3, server_default='3')
 
 
 class Player(Base):
@@ -96,6 +97,8 @@ class Player(Base):
     is_draft_eligible:       Mapped[bool]           = mapped_column(Boolean, default=False, server_default='false')
     retired:                 Mapped[bool]           = mapped_column(Boolean, default=False, server_default='false')
     career_stats:            Mapped[dict]           = mapped_column(JSONB, default=dict, server_default='{}')
+    train_sessions_used:     Mapped[int]            = mapped_column(Integer, default=0, server_default='0')
+    trained_in_week:         Mapped[int]            = mapped_column(Integer, default=0, server_default='0')
 
 
 class Season(Base):

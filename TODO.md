@@ -50,6 +50,14 @@
   - Pick lock: when do picks lock — before each week advances, or a fixed real-time deadline?
   - League source: dedicated CPU-only league per contest, or fantasy overlay on top of an existing regular league?
 
+## --POST LAUNCH-- League Variants & Inclusivity
+- [ ] --POST LAUNCH-- Women's leagues — option for all-female-player leagues, inspired by real women's tackle football (WNFC); adds representation for an underrepresented group and a fresh flavor without new mechanics.
+  - Scope: same sim engine and attributes — purely representational (female name pool, and player art/jersey later if visual identity ships). No engine difference; avoids implying different capability.
+  - Opt-in model: league-type choice at creation (e.g. a "Women's league" option) rather than a global or forced setting — additive content that costs nothing to players uninterested in it.
+  - Positioning/copy: present as a celebratory, optional league flavor, not a political statement; let players self-select. Anticipate mixed community reception ("that's cool" vs. "should be men only") — the opt-in framing is the mitigation: it's one more league to choose, not a change to anyone's existing experience.
+  - Naming: draw inspiration from WNFC but keep original league/team theming (same reason we avoid NFL marks).
+  - Open questions: mixed-league support at all, or strictly separate? surface as a filter on the join/available-leagues screen? any distinct league/conference name theme pool?
+
 ## Long-term / v3
 - [x] Randomized league/conference/division names — pool of curated theme families (Storm, Celestial, Geological, Ocean, Fire, etc.), each with 6 names; at league creation pick one theme at random, assign 1 name to league, 2 to conferences, 4 to divisions (no repeats); conference and division names are thematic peers, not a strict hierarchy; pool is easy to extend; requires storing generated names on League/Team models
 - [x] Aging, decline, and retirement — age curves, fitness-weighted stat decay, retirement threshold (floor ~45 composite)

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_coach, get_db
 from sim.player_gen import POSITION_STATS, assign_label
+from sim.training_sim import resolve_training_session
 from sqlalchemy import func
 from ..models import Coach, Game, GameStatus, League, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team, Transaction, TransactionType
 from ..schemas import (
@@ -19,11 +20,13 @@ from ..schemas import (
     PlayerStatsResponse, ReceivingLeader, ReleaseRequest, ReleaseResponse, RushingLeader,
     SignFARequest, StandingRow, StandingsResponse, TeamHistoryResponse, TeamMatchupSide,
     TeamNewsResponse, TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
+    TrainingPlayerItem, TrainingStateResponse, TrainRequest, TrainResultResponse,
     TransactionItem,
 )
 from ..services.league_service import (
     create_league, OFFSEASON_DAYS, PRESEASON_DAYS,
     PLAYOFF_DIVISIONAL, PLAYOFF_CONF_CHAMP, PLAYOFF_LEAGUE_CHAMP,
+    TRAIN_SESSIONS_PER_PLAYER, MAX_TRAIN_POINTS_PER_SESSION,
     get_draft_class, get_draft_results,
 )
 
@@ -308,6 +311,142 @@ async def get_free_agents(league_id: uuid.UUID, db: AsyncSession = Depends(get_d
     items = _to_scout_items(result.scalars().all())
     items.sort(key=lambda x: (x.position, _LABEL_ORDER.get(x.composite_label, 99), x.name))
     return items
+
+
+# ============================================================
+# TRAINING  (v3 progression — see training_and_potential.md)
+# ============================================================
+
+def _training_message(outcome: str, name: str, stat_changed, injury_games: int) -> str:
+    if outcome == 'upgrade':
+        return f'{name} looked sharp in practice — {stat_changed} is up.'
+    if outcome == 'decline':
+        return f'{name} struggled in a drill and lost some confidence.'
+    if outcome == 'injury':
+        wk = 'week' if injury_games == 1 else 'weeks'
+        return f'{name} got dinged up in a hard session — out {injury_games} {wk}.'
+    return f'{name} put in a solid week of work; no notable change.'
+
+
+async def _latest_season(db: AsyncSession, league_id: uuid.UUID) -> Season | None:
+    result = await db.execute(
+        select(Season)
+        .where(Season.league_id == league_id)
+        .order_by(Season.season_number.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+@router.get('/{league_id}/teams/{team_id}/training', response_model=TrainingStateResponse)
+async def get_training_state(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id or team.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='Not your team')
+
+    season       = await _latest_season(db, league_id)
+    in_regular   = bool(season and season.status == SeasonStatus.regular)
+    current_week = season.current_week if season else 0
+
+    result = await db.execute(
+        select(Player)
+        .where(Player.team_id == team_id, Player.retired == False)  # noqa: E712
+        .order_by(Player.position, Player.composite.desc())
+    )
+    items = []
+    for p in result.scalars().all():
+        stat_names = POSITION_STATS.get(p.position, [])
+        stat_dict  = dict(zip(stat_names, p.stats))
+        ordered    = _reorder_stats(stat_names)
+        used = p.train_sessions_used
+        items.append(TrainingPlayerItem(
+            id=p.id,
+            name=p.name,
+            position=p.position,
+            age=p.age,
+            composite=p.composite,
+            named_stats={name: stat_dict[name] for name in ordered},
+            train_sessions_used=used,
+            sessions_remaining=max(0, TRAIN_SESSIONS_PER_PLAYER - used),
+            trained_this_week=bool(in_regular and p.trained_in_week == current_week),
+            injury_games_remaining=p.injury_games_remaining,
+        ))
+
+    return TrainingStateResponse(
+        train_points=team.train_points,
+        current_week=current_week,
+        in_regular_season=in_regular,
+        sessions_per_player=TRAIN_SESSIONS_PER_PLAYER,
+        players=items,
+    )
+
+
+@router.post('/{league_id}/teams/{team_id}/train', response_model=TrainResultResponse)
+async def train_player(
+    league_id: uuid.UUID,
+    team_id:   uuid.UUID,
+    body:      TrainRequest,
+    db:        AsyncSession = Depends(get_db),
+    coach:     Coach        = Depends(get_current_coach),
+):
+    team = await db.get(Team, team_id)
+    if not team or team.league_id != league_id or team.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='Not your team')
+
+    season = await _latest_season(db, league_id)
+    if not season or season.status != SeasonStatus.regular:
+        raise HTTPException(status_code=409, detail='Training is only available during the regular season')
+
+    points = body.points
+    if points < 1 or points > MAX_TRAIN_POINTS_PER_SESSION:
+        raise HTTPException(status_code=400, detail=f'Points must be between 1 and {MAX_TRAIN_POINTS_PER_SESSION}')
+    if points > team.train_points:
+        raise HTTPException(status_code=400, detail='Not enough training points this week')
+
+    player = await db.get(Player, body.player_id)
+    if not player or player.team_id != team_id or player.retired:
+        raise HTTPException(status_code=404, detail='Player not on your roster')
+    if player.injury_games_remaining > 0 or player.on_ir:
+        raise HTTPException(status_code=409, detail='Player is injured and cannot train')
+    if player.train_sessions_used >= TRAIN_SESSIONS_PER_PLAYER:
+        raise HTTPException(status_code=409, detail='Player has no training sessions left this season')
+    if player.trained_in_week == season.current_week:
+        raise HTTPException(status_code=409, detail='Player already trained this week')
+
+    result = resolve_training_session(
+        stats=player.stats,
+        composite=player.composite,
+        potential=player.potential,
+        position=player.position,
+        age=player.age,
+        intensity=points,
+    )
+
+    player.stats     = list(result.stats)
+    player.composite = result.composite
+    if result.outcome == 'injury':
+        player.injury_games_remaining = result.injury_games
+    player.train_sessions_used += 1
+    player.trained_in_week      = season.current_week
+    team.train_points          -= points
+    await db.commit()
+
+    return TrainResultResponse(
+        outcome=result.outcome,
+        message=_training_message(result.outcome, player.name, result.stat_changed, result.injury_games),
+        stat_changed=result.stat_changed,
+        delta=result.delta,
+        composite=result.composite,
+        injury_games=result.injury_games,
+        train_points=team.train_points,
+        train_sessions_used=player.train_sessions_used,
+        sessions_remaining=max(0, TRAIN_SESSIONS_PER_PLAYER - player.train_sessions_used),
+    )
 
 
 _POSITION_MAX_ACTIVE = {
