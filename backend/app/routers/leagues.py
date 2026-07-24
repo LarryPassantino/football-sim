@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_coach, get_db
-from sim.player_gen import POSITION_STATS, assign_label
+from sim.player_gen import POSITION_STATS, assign_label, assign_ceiling_label
 from sim.training_sim import resolve_training_session
 from sqlalchemy import func
 from ..models import Coach, Game, GameStatus, League, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team, Transaction, TransactionType
@@ -284,6 +284,7 @@ async def get_roster(league_id: uuid.UUID, team_id: uuid.UUID, db: AsyncSession 
             position=p.position,
             age=p.age,
             composite=p.composite,
+            ceiling_label=assign_ceiling_label(p.composite, p.potential, p.id),
             named_stats={name: stat_dict[name] for name in ordered},
             injury_games_remaining=p.injury_games_remaining,
             on_ir=p.on_ir,
@@ -431,6 +432,7 @@ async def train_player(
     player.composite = result.composite
     if result.outcome == 'injury':
         player.injury_games_remaining = result.injury_games
+        player.on_ir                  = True   # frees the active slot, like a game injury
     player.train_sessions_used += 1
     player.trained_in_week      = season.current_week
     team.train_points          -= points
@@ -674,6 +676,7 @@ def _to_scout_items(players) -> list[PlayerScoutItem]:
             position=p.position,
             age=p.age,
             composite_label=assign_label(p.composite),
+            ceiling_label=assign_ceiling_label(p.composite, p.potential, p.id),
             named_stat_labels={name: assign_label(stat_dict[name]) for name in ordered},
             injury_games_remaining=p.injury_games_remaining,
         ))

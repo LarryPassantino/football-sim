@@ -33,7 +33,7 @@ PLAYOFF_LEAGUE_CHAMP = 20
 
 # Training (v3 progression) — see training_and_potential.md
 TRAIN_POINTS_PER_CYCLE       = 3   # per team, replenished each regular-season week
-TRAIN_SESSIONS_PER_PLAYER    = 3   # per player, per season
+TRAIN_SESSIONS_PER_PLAYER    = 4   # per player, per season
 MAX_TRAIN_POINTS_PER_SESSION = 3   # a single session can hold at most this many points
 CPU_MAX_INTENSITY            = 2   # CPUs train at moderate intensity to limit self-injury
 
@@ -610,6 +610,7 @@ async def _cpu_train_team(db: AsyncSession, team: Team, season: Season) -> None:
         p.composite = res.composite
         if res.outcome == 'injury':
             p.injury_games_remaining = res.injury_games
+            p.on_ir                  = True   # frees the active slot, like a game injury
         p.train_sessions_used += 1
         p.trained_in_week      = season.current_week
         points -= intensity
@@ -920,6 +921,15 @@ DRAFT_CLASS_AGES = [21, 21, 22, 22, 22, 23, 23, 23]
 DRAFT_TOLERANCE  = 5.0   # composite points; within this, follow position priority
 PRESEASON_DAYS   = 2
 
+# ── CPU draft potential blend (v3 progression — see training_and_potential.md §8) ──
+# CPUs value a slice of a player's unrealized upside, scaled by how much room age
+# leaves to realize it. draft → develop → reap is the intended loop; young projects
+# the CPU passes over on raw ability still get taken, and the ones that slip become
+# the "given-up-on gems" a human can find.
+DRAFT_POTENTIAL_WEIGHT   = 0.35   # k — base fraction of (potential − composite) counted
+DRAFT_MATURITY_AGE       = 26     # by this age there's little time left to develop; upside → 0
+DRAFT_PHILOSOPHY_JITTER  = 0.15   # per-team, deterministic: some CPUs chase upside, some don't
+
 FA_MAX_PER_POSITION = {
     'K': 6,  'P': 6,
     'TE': 8, 'RB': 8,
@@ -1031,13 +1041,14 @@ async def generate_annual_draft_class(db: AsyncSession, league_id: uuid.UUID) ->
         'picks':       [],
     }
 
-    # Clear per-coach player rankings — prior class IDs are invalid for the new class
+    # Reset every coach's draft board each offseason — prior-class player IDs are
+    # invalid for the new class, and position priorities are a fresh call each year.
     result = await db.execute(select(Team).where(Team.league_id == league_id))
     from sqlalchemy.orm.attributes import flag_modified
     for team in result.scalars().all():
         if team.draft_board:
             team.draft_board = {
-                'position_priority': team.draft_board.get('position_priority', [None] * 5),
+                'position_priority': [None] * 5,
                 'player_ranking': [],
             }
             flag_modified(team, 'draft_board')
@@ -1045,10 +1056,27 @@ async def generate_annual_draft_class(db: AsyncSession, league_id: uuid.UUID) ->
     await db.commit()
 
 
-def _cpu_draft_pick(available: list, roster_counts: dict[str, int]) -> 'Player | None':
+def _cpu_draft_value(player, philosophy: float) -> float:
+    """
+    CPU's perceived value of a draft prospect: current ability plus a philosophy-
+    weighted slice of unrealized upside, discounted as the player nears the age
+    where there's no time left to develop it (decision #10). Never touches the
+    fuzzy grade a human sees — this is the CPU's own hidden read.
+    """
+    k          = DRAFT_POTENTIAL_WEIGHT + philosophy
+    age_factor = min(1.0, max(0.0, (DRAFT_MATURITY_AGE - player.age) / 4.0))
+    return player.composite + k * (player.potential - player.composite) * age_factor
+
+
+def _cpu_draft_pick(available: list, roster_counts: dict[str, int], team_id) -> 'Player | None':
     """Pick best available for a CPU team using urgency scoring."""
     if not available:
         return None
+
+    # Stable per-team lean so all CPUs don't draft identically — the irrationality
+    # leaves undervalued young players on the board for a human to scoop.
+    philosophy = random.Random(str(team_id)).uniform(-DRAFT_PHILOSOPHY_JITTER, DRAFT_PHILOSOPHY_JITTER)
+    value = lambda p: _cpu_draft_value(p, philosophy)
 
     def urgency(pos: str) -> float:
         deficit = max(0, ROSTER_SLOTS[pos] - roster_counts.get(pos, 0))
@@ -1068,10 +1096,10 @@ def _cpu_draft_pick(available: list, roster_counts: dict[str, int]) -> 'Player |
             (pos for pos in by_pos if by_pos[pos]),
             key=urgency,
         )
-        return max(by_pos[best_pos], key=lambda p: p.composite)
+        return max(by_pos[best_pos], key=value)
     else:
         # Rosters full — pick best available overall regardless of position
-        return max(available, key=lambda p: p.composite)
+        return max(available, key=value)
 
 
 def _board_draft_pick(
@@ -1193,7 +1221,7 @@ async def run_full_draft(db: AsyncSession, league_id: uuid.UUID) -> None:
                 positions_filled[team_id].add(pos_used)
         else:
             # CPU team — urgency algorithm
-            player = _cpu_draft_pick(available, roster_counts[team_id])
+            player = _cpu_draft_pick(available, roster_counts[team_id], team_id)
 
         if player is None:
             break
@@ -1274,7 +1302,7 @@ async def end_preseason(db: AsyncSession, league_id: uuid.UUID) -> None:
 
 async def get_draft_class(db: AsyncSession, league_id: uuid.UUID) -> list[dict]:
     """Return all draft-eligible players in scout (draft-label) view."""
-    from sim.player_gen import assign_draft_label, POSITION_STATS
+    from sim.player_gen import assign_draft_label, assign_ceiling_label, POSITION_STATS
 
     result = await db.execute(
         select(Player)
@@ -1285,12 +1313,13 @@ async def get_draft_class(db: AsyncSession, league_id: uuid.UUID) -> list[dict]:
     for p in result.scalars().all():
         stat_names = POSITION_STATS[p.position]
         out.append({
-            'id':        str(p.id),
-            'name':      p.name,
-            'position':  p.position,
-            'age':       p.age,
-            'composite': assign_draft_label(p.composite),
-            'stats':     {n: assign_draft_label(v) for n, v in zip(stat_names, p.stats)},
+            'id':            str(p.id),
+            'name':          p.name,
+            'position':      p.position,
+            'age':           p.age,
+            'composite':     assign_draft_label(p.composite),
+            'ceiling_label': assign_ceiling_label(p.composite, p.potential, p.id),
+            'stats':         {n: assign_draft_label(v) for n, v in zip(stat_names, p.stats)},
         })
     return out
 

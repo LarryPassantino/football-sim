@@ -134,6 +134,7 @@ class PlayerScoutItem(BaseModel):
     position:               str
     age:                    int
     composite_label:        str
+    ceiling_label:          str
     named_stat_labels:      dict[str, str]
     injury_games_remaining: int
 
@@ -144,6 +145,7 @@ class PlayerRosterItem(BaseModel):
     position:               str
     age:                    int
     composite:              float
+    ceiling_label:          str
     named_stats:            dict[str, int]
     injury_games_remaining: int
     on_ir:                  bool
@@ -375,12 +377,13 @@ class DraftPickRequest(BaseModel):
 
 
 class DraftPlayerItem(BaseModel):
-    id:        str
-    name:      str
-    position:  str
-    age:       int
-    composite: str
-    stats:     dict[str, str]
+    id:            str
+    name:          str
+    position:      str
+    age:           int
+    composite:     str
+    ceiling_label: str
+    stats:         dict[str, str]
 
 
 class DraftPickRecord(BaseModel):

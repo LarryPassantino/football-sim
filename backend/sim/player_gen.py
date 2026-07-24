@@ -52,6 +52,39 @@ def assign_draft_label(value):
 
 
 # ============================================================
+# CEILING / UPSIDE GRADE  (v3 progression — fuzzy, never numeric)
+# ============================================================
+
+# Rating tier ranks, low → high (Weak=0 … Elite=4). Derived from LABEL_RANGES so
+# the two systems can never drift apart.
+_LABEL_RANK = {label: rank for rank, (_, label) in enumerate(reversed(LABEL_RANGES))}
+
+# Subtle per-player fuzz on the *perceived* ceiling (decision #8). One knob: the
+# grade stays trustworthy — the real boom/bust lives in the development RNG — but
+# a player sitting near a tier boundary can read a tier off. Dial up if the draft
+# ever feels "solved."
+CEILING_JITTER = 3.0
+
+def assign_ceiling_label(composite: float, potential: float, player_id) -> str:
+    """
+    Fuzzy upside grade: how many rating tiers a player's (hidden) ceiling sits
+    above their current composite, expressed as a tier delta rather than a number
+    (decision #9 — the exact potential is never shown anywhere).
+
+    A small deterministic jitter seeded on ``player_id`` keeps the grade stable
+    across refreshes yet occasionally nudges it a tier off honest (decision #8).
+    """
+    rng       = random.Random(str(player_id))
+    perceived = potential + rng.uniform(-CEILING_JITTER, CEILING_JITTER)
+    delta     = _LABEL_RANK[assign_label(perceived)] - _LABEL_RANK[assign_label(composite)]
+    if delta >= 2:
+        return 'High Upside'
+    if delta == 1:
+        return 'Some Upside'
+    return 'Near Ceiling'
+
+
+# ============================================================
 # POSITION DEFINITIONS
 # ============================================================
 

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/upside.dart';
 
 const _kPositions = ['QB', 'WR', 'TE', 'RB', 'OL', 'DT', 'DE', 'LB', 'CB', 'S', 'K', 'P'];
 
@@ -13,6 +14,7 @@ class _DraftPlayer {
   final String position;
   final int age;
   final String composite;
+  final String ceilingLabel;
   final Map<String, String> stats;
 
   _DraftPlayer.fromJson(Map<String, dynamic> j)
@@ -21,6 +23,7 @@ class _DraftPlayer {
         position = j['position'],
         age = j['age'],
         composite = j['composite'],
+        ceilingLabel = j['ceiling_label'],
         stats = Map<String, String>.from(j['stats'] as Map);
 }
 
@@ -403,7 +406,18 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
     return ListTile(
       key: key,
       title: Text(player.name),
-      subtitle: Text('${player.position}  ·  Age ${player.age}  ·  ${player.composite}'),
+      subtitle: Row(
+        children: [
+          Flexible(
+            child: Text(
+              '${player.position}  ·  Age ${player.age}  ·  ${player.composite}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          UpsideChip(player.ceilingLabel, compact: true),
+        ],
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -433,6 +447,14 @@ class _DraftScreenState extends State<DraftScreen> with SingleTickerProviderStat
             Text(
               '${player.position}  ·  Age ${player.age}  ·  ${player.composite}',
               style: TextStyle(color: Theme.of(context).colorScheme.outline),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text('Upside', style: Theme.of(context).textTheme.labelMedium),
+                const SizedBox(width: 10),
+                UpsideChip(player.ceilingLabel),
+              ],
             ),
             const SizedBox(height: 16),
             ...player.stats.entries.map((e) => Padding(

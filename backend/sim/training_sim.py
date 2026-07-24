@@ -28,16 +28,16 @@ from dataclasses import dataclass
 from .player_gen import POSITION_STATS, WEIGHTS_6, WEIGHTS_3
 
 # ── Tuning knobs (see training_and_potential.md) ─────────────────────────────
-BASE_INJURY            = 0.03   # × intensity × age_factor
-BASE_UPGRADE           = 0.20   # × intensity × headroom_factor
-DECLINE_BASE           = 0.07   # flat "lost confidence" background risk
+BASE_INJURY            = 0.025  # × intensity × age_factor
+BASE_UPGRADE           = 0.28   # × intensity × headroom_factor
+DECLINE_BASE           = 0.04   # flat "lost confidence" background risk
 DECLINE_HEADROOM_BONUS = 0.05   # extra decline risk near the ceiling
-HEADROOM_FULL          = 10.0   # headroom (composite pts) at which gains are un-throttled
+HEADROOM_FULL          = 7.0    # headroom (composite pts) at which gains are un-throttled
 AGE_FRAGILE_START      = 27     # injury risk starts climbing past this age
 AGE_FRAGILE_SLOPE      = 0.08   # per year over AGE_FRAGILE_START
 INJURY_WEEKS           = (1, 4) # training injuries are multi-week only, never career-ending
 DEV_MATURITY_AGE       = 26     # age at which full potential first becomes attainable
-DEV_GAP_PER_YEAR       = 1.25   # composite pts of potential locked per year below maturity
+DEV_GAP_PER_YEAR       = 0.75   # composite pts of potential locked per year below maturity
 UPGRADE_STATS_MIN      = 3      # a successful session spreads gains across this many …
 UPGRADE_STATS_MAX      = 4      # … to this many attributes (weighted toward important ones)
 STAT_FLOOR             = 30

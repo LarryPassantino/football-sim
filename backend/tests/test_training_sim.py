@@ -106,8 +106,9 @@ def test_upgrades_happen_with_headroom():
         res = resolve_training_session(stats, comp, comp + 20, position, 23, 3, rng)
         counts[res.outcome] += 1
     rate = counts['upgrade'] / N
-    # intensity 3, full headroom → ~0.60 upgrade probability (BASE_UPGRADE 0.20 × 3)
-    check(0.50 < rate < 0.68, f"upgrade rate {rate:.2f} in expected band (~0.60)")
+    # intensity 3, full headroom → ~0.78 upgrade rate:
+    #   upgrade_p = BASE_UPGRADE 0.28 × 3 = 0.84, less the 0.075 injury pre-empt.
+    check(0.72 < rate < 0.84, f"upgrade rate {rate:.2f} in expected band (~0.78)")
     print(f"  distribution @ intensity 3, full headroom: {counts}")
 
 

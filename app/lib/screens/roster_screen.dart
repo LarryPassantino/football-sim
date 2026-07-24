@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/upside.dart';
 
 class _Player {
   final String id;
@@ -11,6 +12,7 @@ class _Player {
   final String position;
   final int age;
   final double composite;
+  final String ceilingLabel;
   final Map<String, int> namedStats;
   final int injuryGamesRemaining;
   final bool onIr;
@@ -21,6 +23,7 @@ class _Player {
         position = j['position'],
         age = j['age'],
         composite = (j['composite'] as num).toDouble(),
+        ceilingLabel = j['ceiling_label'],
         namedStats = (j['named_stats'] as Map<String, dynamic>)
             .map((k, v) => MapEntry(k, v as int)),
         injuryGamesRemaining = j['injury_games_remaining'],
@@ -221,7 +224,13 @@ class _RosterScreenState extends State<RosterScreen> {
     return ListTile(
       dense: true,
       title: Text(player.name),
-      subtitle: Text(subtitle),
+      subtitle: Row(
+        children: [
+          Text(subtitle),
+          const SizedBox(width: 8),
+          UpsideChip(player.ceilingLabel, compact: true),
+        ],
+      ),
       trailing: trailing,
       onTap: player.isReturnReady ? null : () => _showPlayerDetail(player),
     );
@@ -526,6 +535,14 @@ class _PlayerDetailSheetState extends State<_PlayerDetailSheet> {
                   ),
                 ),
                 _compositeDisplay(context, player.composite),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text('Upside', style: Theme.of(context).textTheme.labelMedium),
+                const SizedBox(width: 10),
+                UpsideChip(player.ceilingLabel),
               ],
             ),
             const Divider(height: 32),

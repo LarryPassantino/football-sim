@@ -1,5 +1,23 @@
 # Training & Draft Potential — Implementation Plan
 
+> **RESUME / STATUS (2026-07-15):** Both phases now **code-complete, not yet committed.**
+> - **Phase 1** (training loop): committed — `0d2f2bf` (backend) + `8ec66b6` (frontend); migration
+>   `d7f4a1b9c2e3` applied as SQL in Railway.
+> - **Phase 2** (potential surfacing): implemented this session, uncommitted. No schema change.
+>   - §6 `assign_ceiling_label(composite, potential, player_id)` in `backend/sim/player_gen.py`
+>     (fuzzy tier delta + per-player jitter `CEILING_JITTER=3.0`); tests in
+>     `backend/tests/test_ceiling_label.py` (dependency-free, green).
+>   - §7 `ceiling_label` on `PlayerScoutItem` / `PlayerRosterItem` / `DraftPlayerItem`; populated in
+>     `_to_scout_items` + `get_roster` (`routers/leagues.py`) and `get_draft_class` (`services/league_service.py`).
+>   - §8 CPU draft blend: `_cpu_draft_value` + potential-weighted picks in `_cpu_draft_pick`
+>     (`k=DRAFT_POTENTIAL_WEIGHT 0.35`, per-team `DRAFT_PHILOSOPHY_JITTER 0.15`, age-discounted to
+>     `DRAFT_MATURITY_AGE 26`). **Deliberately scoped to CPU only** — `_board_draft_pick` runs only for
+>     human teams, so it was left untouched (blending into it would override a human's stated board).
+>     Confirmed `run_cpu_roster_moves` signs FAs by `composite.desc()`, so cut young projects stay in the
+>     pool → "given-up-on gem" mechanic works, no change needed.
+>   - §9 Flutter: shared `app/lib/widgets/upside.dart` (`UpsideChip`) wired into scout, roster, draft screens.
+> **Next:** commit Phase 1 is already in; commit Phase 2, deploy, playtest. `flutter analyze` clean on changed files.
+
 ## Goal / why
 
 Adds two linked features that turn the game from "set roster, wait" into an
@@ -209,13 +227,30 @@ pool accumulates undervalued young players.
 
 ---
 
-## Tuned values (as of first pass — verified by simulation)
+## Tuned values (rebalanced 2026-07-24 — "moderate" impact pass)
 
-Constants in `sim/training_sim.py`:
-- `BASE_UPGRADE = 0.20`, `BASE_INJURY = 0.03`, `DECLINE_BASE = 0.07`
-- `DEV_MATURITY_AGE = 26`, `DEV_GAP_PER_YEAR = 1.25`
-- Upgrade spreads across `UPGRADE_STATS_MIN..MAX = 3..4` attributes, +1–3 each (×intensity)
-- CPU trains at `CPU_MAX_INTENSITY = 2` (moderate, limits self-injury)
+First pass felt too weak in playtest: ~1–2 upgrades a season and 2 injuries. Root
+cause was the age gate — a young player's attainable ceiling sat only a couple pts
+above his composite, so successful rolls clamped to "none." Rebalanced to make an
+upgrade the common outcome while keeping the multi-season arc (values in `sim/training_sim.py`
+unless noted):
+- `BASE_UPGRADE = 0.28` (was 0.20), `BASE_INJURY = 0.025` (was 0.03), `DECLINE_BASE = 0.04` (was 0.07)
+- `HEADROOM_FULL = 7.0` (was 10) — gains stay un-throttled with less headroom
+- `DEV_GAP_PER_YEAR = 0.75` (was 1.25) — young players get real headroom now (22yo ceiling ≈ potential−3, was −5)
+- `TRAIN_SESSIONS_PER_PLAYER = 4` (was 3, in `league_service.py`) — watch one guy actually grow
+- Unchanged: `DEV_MATURITY_AGE = 26`, upgrade spreads across `3..4` attributes (+1–3 each ×intensity),
+  `CPU_MAX_INTENSITY = 2`
+- Measured @ intensity 3 / full headroom: ~78% upgrade, ~4% decline, ~7.5% injury.
+
+### Injury persistence fix (2026-07-24)
+Training injuries now set `player.on_ir = True` (endpoint + `_cpu_train_team`), mirroring the
+game-injury path in `sim_bridge.write_back_injuries`. Previously only `injury_games_remaining`
+was set, so the injured player still occupied his active slot and no FA replacement could be
+signed. Now the slot frees, sign an FA, activate off IR on recovery — identical to a game injury.
+
+### Draft board reset (2026-07-24)
+`generate_annual_draft_class` now resets `position_priority` to `[None]*5` each offseason (it
+already cleared `player_ranking`); prior-season priorities no longer carry over.
 
 **Measured pace** (full headroom): int1 ~0.6, int2 ~1.5, int3 ~2.7 composite/season.
 **Career arc** (high-ceiling prospect, ~16 headroom, drafted at 22):
