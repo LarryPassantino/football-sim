@@ -92,9 +92,26 @@ K/P use `[0.50, 0.30, 0.20]`.
 
 **Group composite** — multiple starters averaged, then 80/20 split with backup:
 ```
-group = 0.80 × avg(starter composites) + 0.20 × backup composite
+group = 0.80 × avg(effective starter composites) + 0.20 × effective backup composite
 ```
 All starters play meaningful snaps — the group is only as good as the average across them, not just the best.
+
+**Superstar effect** (`football_sim.py`, added 2026-07-24) — before averaging, each player's
+contribution is bumped for talent above the Elite line:
+```
+effective = composite + SUPERSTAR_SCALE × max(0, composite − SUPERSTAR_THRESHOLD)
+SUPERSTAR_THRESHOLD = 83.0   # the 'Elite' scouting-label boundary
+SUPERSTAR_SCALE     = 0.9    # each pt over 83 counts ~1.9×; tune after playtest
+```
+*Why:* flat starter-averaging washed out concentrated star talent (a lone elite OL is
+averaged with four average linemen), so drafted-league team ratings clustered tightly
+(std ~2.4, best-to-worst range ~8) and the strongest roster only won ~61%/game vs a median
+team → too much parity. Players **at or below 83 get zero bump**, so the parity floor for
+star-less teams is mathematically unchanged; only elite-heavy rosters widen their gap.
+Measured effect at scale 0.9: strongest team's per-game win rate vs median 63%→72%, and over
+a 17-game season it tops the standings 30%→48% and makes the playoffs 68%→87% — a reliable
+contender that still gets upset. Keys off *current* composite, so training a starter past 83
+compounds into team value (ties into the [training loop](training_and_potential.md)).
 
 ---
 

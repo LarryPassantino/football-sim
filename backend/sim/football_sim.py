@@ -57,6 +57,15 @@ UNIT_DAY_SCALE = 6   # std dev of per-unit shift on top of team factor
 DRIVES_PER_TEAM = 12
 AVERAGE_RATING  = 70
 
+# --- Superstar effect ---
+# In a position group's rollup, a player's contribution is boosted by this scale
+# for every composite point he sits above ELITE_THRESHOLD. Players at or below the
+# threshold get zero bump, so star-less teams (the parity floor) are unaffected;
+# only concentrated elite talent widens a team's rating gap. Threshold matches the
+# 'Elite' scouting label (player_gen.LABEL_RANGES) so the effect is explainable.
+SUPERSTAR_THRESHOLD = 83.0
+SUPERSTAR_SCALE     = 0.9
+
 POSITION_GROUPS = ['qb', 'wr', 'rb', 'ol', 'dt', 'de', 'lb', 'cb', 's', 'k']
 
 # --- Game plan composite modifiers (applied to flat team dict pre-sim) ---
@@ -186,18 +195,29 @@ def player_composite(player):
     return sum(s * w for s, w in zip(player['stats'], weights))
 
 
+def _superstar_composite(player):
+    """A player's composite with the superstar bump applied — elite players punch
+    above their raw rating in the group rollup; everyone at/below the threshold is
+    unchanged (see SUPERSTAR_SCALE)."""
+    c = player_composite(player)
+    return c + SUPERSTAR_SCALE * max(0.0, c - SUPERSTAR_THRESHOLD)
+
+
 def group_composite(starters, backup=None):
     """
     Average starter composites (all starters play significant snaps),
     then apply 80/20 split with the backup.
     No backup (K, P) returns starter average directly.
+
+    Elite starters carry the superstar bump so a few stars aren't fully washed
+    out by average teammates in deep position groups.
     """
     if not starters:
         return 0
-    starter_avg = sum(player_composite(p) for p in starters) / len(starters)
+    starter_avg = sum(_superstar_composite(p) for p in starters) / len(starters)
     if backup is None:
         return starter_avg
-    return 0.80 * starter_avg + 0.20 * player_composite(backup)
+    return 0.80 * starter_avg + 0.20 * _superstar_composite(backup)
 
 
 def make_team_from_roster(name, roster):
