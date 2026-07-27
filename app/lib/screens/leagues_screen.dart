@@ -8,6 +8,7 @@ import 'game_detail_screen.dart';
 import 'history_screen.dart';
 import 'league_leaders_screen.dart';
 import 'matchup_screen.dart';
+import 'message_board_screen.dart';
 import 'roster_screen.dart';
 import 'draft_screen.dart';
 import 'schedule_screen.dart';
@@ -410,6 +411,17 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => TransactionsScreen(leagueId: leagueId),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.forum),
+          label: const Text('Message Board'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MessageBoardScreen(leagueId: leagueId),
             ),
           ),
         ),

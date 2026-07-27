@@ -12,7 +12,7 @@ from ..dependencies import get_current_coach, get_db
 from sim.player_gen import POSITION_STATS, assign_label, assign_ceiling_label
 from sim.training_sim import resolve_training_session
 from sqlalchemy import func
-from ..models import Coach, Game, GameStatus, League, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team, Transaction, TransactionType
+from ..models import Coach, Game, GameStatus, League, LeagueMessage, LeagueStatus, Player, PlayerGameStats, Season, SeasonStatus, Team, Transaction, TransactionType
 from ..schemas import (
     ActivateRequest, AvailableLeaguesResponse, DefenseLeader,
     GameDetailResponse, GameMatchupResponse, GamePlanRequest, GameResponse, GroupComposite,
@@ -23,6 +23,7 @@ from ..schemas import (
     TeamNewsResponse, TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
     TrainingPlayerItem, TrainingStateResponse, TrainRequest, TrainResultResponse,
     TransactionItem, TransactionsPageResponse,
+    PostMessageRequest, MessageItem, MessagesPageResponse,
 )
 from ..services.league_service import (
     create_league, OFFSEASON_DAYS, PRESEASON_DAYS,
@@ -1555,8 +1556,9 @@ async def set_draft_board(
 # TRANSACTION ENDPOINTS
 # ============================================================
 
-def _encode_cursor(t: Transaction) -> str:
-    raw = f'{t.created_at.isoformat()}|{t.id}'
+def _encode_cursor(row) -> str:
+    """Keyset cursor for any row with .created_at + .id (transactions, messages)."""
+    raw = f'{row.created_at.isoformat()}|{row.id}'
     return base64.urlsafe_b64encode(raw.encode()).decode()
 
 
@@ -1625,3 +1627,121 @@ async def get_transactions(
         ],
         next_cursor=_encode_cursor(page[-1]) if has_more and page else None,
     )
+
+
+# ============================================================
+# LEAGUE MESSAGE BOARD  (flat feed — TODO.md "Social")
+# ============================================================
+
+async def _require_league_team(db: AsyncSession, league_id: uuid.UUID, coach: Coach) -> Team:
+    """Return the caller's team in this league, or 403 if they aren't a coach here."""
+    result = await db.execute(
+        select(Team).where(Team.league_id == league_id, Team.coach_id == coach.id)
+    )
+    team = result.scalar_one_or_none()
+    _require_team_in_league(team)
+    return team
+
+
+@router.get('/{league_id}/messages', response_model=MessagesPageResponse)
+async def get_messages(
+    league_id: uuid.UUID,
+    cursor:    str | None   = Query(None, description='Opaque pagination cursor from a previous page'),
+    limit:     int          = Query(25, ge=1, le=100),
+    coach:     Coach        = Depends(get_current_coach),
+    db:        AsyncSession = Depends(get_db),
+):
+    await _require_league_team(db, league_id, coach)
+
+    query = (
+        select(LeagueMessage)
+        .where(LeagueMessage.league_id == league_id, LeagueMessage.deleted_at.is_(None))
+        .order_by(LeagueMessage.created_at.desc(), LeagueMessage.id.desc())
+    )
+    if cursor is not None:
+        try:
+            c_ts, c_id = _decode_cursor(cursor)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail='Invalid cursor')
+        query = query.where(
+            or_(
+                LeagueMessage.created_at < c_ts,
+                and_(LeagueMessage.created_at == c_ts, LeagueMessage.id < c_id),
+            )
+        )
+
+    result = await db.execute(query.limit(limit + 1))
+    rows = result.scalars().all()
+    has_more = len(rows) > limit
+    page = rows[:limit]
+
+    return MessagesPageResponse(
+        items=[
+            MessageItem(
+                id=m.id,
+                team_id=m.team_id,
+                team_name=m.team_name,
+                coach_name=m.coach_name,
+                body=m.body,
+                created_at=m.created_at.isoformat(),
+                is_mine=(m.coach_id == coach.id),
+            )
+            for m in page
+        ],
+        next_cursor=_encode_cursor(page[-1]) if has_more and page else None,
+    )
+
+
+@router.post('/{league_id}/messages', response_model=MessageItem, status_code=201)
+async def post_message(
+    league_id: uuid.UUID,
+    body:      PostMessageRequest,
+    coach:     Coach        = Depends(get_current_coach),
+    db:        AsyncSession = Depends(get_db),
+):
+    team = await _require_league_team(db, league_id, coach)
+
+    text = body.body.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail='Message cannot be empty')
+
+    # Set id + created_at explicitly so we never read back an expired row post-commit.
+    now = datetime.now(timezone.utc)
+    msg = LeagueMessage(
+        id=uuid.uuid4(),
+        league_id=league_id,
+        team_id=team.id,
+        coach_id=coach.id,
+        team_name=team.name,
+        coach_name=coach.display_name,
+        body=text,
+        created_at=now,
+    )
+    db.add(msg)
+    await db.commit()
+
+    return MessageItem(
+        id=msg.id,
+        team_id=team.id,
+        team_name=team.name,
+        coach_name=coach.display_name,
+        body=text,
+        created_at=now.isoformat(),
+        is_mine=True,
+    )
+
+
+@router.delete('/{league_id}/messages/{message_id}', status_code=204)
+async def delete_message(
+    league_id:  uuid.UUID,
+    message_id: uuid.UUID,
+    coach:      Coach        = Depends(get_current_coach),
+    db:         AsyncSession = Depends(get_db),
+):
+    msg = await db.get(LeagueMessage, message_id)
+    if not msg or msg.league_id != league_id or msg.deleted_at is not None:
+        raise HTTPException(status_code=404, detail='Message not found')
+    if msg.coach_id != coach.id:
+        raise HTTPException(status_code=403, detail='You can only delete your own messages')
+    msg.deleted_at = datetime.now(timezone.utc)
+    await db.commit()

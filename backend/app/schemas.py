@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
@@ -411,6 +411,25 @@ class TransactionItem(BaseModel):
 class TransactionsPageResponse(BaseModel):
     items:       list[TransactionItem]
     next_cursor: str | None            # opaque; pass back as ?cursor= for the next page
+
+
+class PostMessageRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=500)
+
+
+class MessageItem(BaseModel):
+    id:         uuid.UUID
+    team_id:    uuid.UUID | None
+    team_name:  str
+    coach_name: str
+    body:       str
+    created_at: str
+    is_mine:    bool                   # authored by the requesting coach (drives delete affordance)
+
+
+class MessagesPageResponse(BaseModel):
+    items:       list[MessageItem]
+    next_cursor: str | None
 
 
 class DraftStateResponse(BaseModel):

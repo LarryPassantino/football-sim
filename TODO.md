@@ -17,7 +17,7 @@
 - [x] Scoring play log — requires sim changes to record plays in sequence + new DB table; natural companion to game detail screen
 
 ## Social
-- [ ] League message board — coaches can post text messages visible to all coaches in the league; persistent across the season; natural home for trade talk, trash talk, and draft reactions; open design questions: threaded vs. flat, moderation, per-season vs. all-time archive
+- [x] League message board — built 2026-07-27: **flat** feed, **all-time** league-wide archive, post-as-team (team + coach name snapshot), author soft-delete (`deleted_at`). Keyset cursor pagination + infinite scroll (reuses the transactions pattern). Model `LeagueMessage` + migration `b8d3f1a6c9e2`; endpoints `GET/POST /{league}/messages` + `DELETE /{league}/messages/{id}`; `message_board_screen.dart` + nav button. Resolved the open design Qs: flat over threaded, all-time over per-season, author-delete (no commissioner/report yet). PENDING: new-post push notification (the "then push" tie-in).
 
 ## Engagement
 - [x] Game plan — weekly OFF/DEF setting (Balanced / Run Focus / Pass Focus; Balanced / Run Stop / Pass Rush); resets to Balanced each week advance so user must actively choose; set on the matchup screen pre-game; sim reads it and applies play-call probability + stat modifiers; CPU teams get a plan too (random or composite-based)
@@ -27,7 +27,7 @@
 
 ## Verify / Bugs (season 3)
 - [x] Push notifications — not confirmed working end of season 2; verify a game notification fires this season
-- [ ] Playoff team news — spectator mode headlines may not have been showing correctly for eliminated teams
+- [x] Playoff team news — spectator mode headlines may not have been showing correctly for eliminated teams
 - [x] Transactions list — fixed: _current_season_id was filtering out complete seasons, writing NULL season_id during preseason; verify transactions appear this season
 
 ## Polish

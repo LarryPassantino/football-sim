@@ -192,3 +192,19 @@ class PlayerGameStats(Base):
     fumble_recoveries: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
 
     player: Mapped['Player'] = relationship('Player', lazy='noload')
+
+
+class LeagueMessage(Base):
+    __tablename__ = 'league_messages'
+
+    id:         Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    league_id:  Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), ForeignKey('leagues.id'), nullable=False)
+    # Author identity: team_id/coach_id are the stable keys (nullable so a message
+    # survives a team/coach going away); team_name/coach_name are display snapshots.
+    team_id:    Mapped[uuid.UUID|None] = mapped_column(UUID(as_uuid=True), ForeignKey('teams.id'), nullable=True)
+    coach_id:   Mapped[uuid.UUID|None] = mapped_column(UUID(as_uuid=True), ForeignKey('coaches.id'), nullable=True)
+    team_name:  Mapped[str]            = mapped_column(String(100), nullable=False)
+    coach_name: Mapped[str]            = mapped_column(String(100), nullable=False)
+    body:       Mapped[str]            = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=_now)
+    deleted_at: Mapped[datetime|None]  = mapped_column(DateTime(timezone=True), nullable=True)
