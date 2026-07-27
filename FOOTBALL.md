@@ -315,6 +315,8 @@ Stats are hidden behind named labels at draft time. Exact numbers are only visib
 
 **Free agents:** Always show labels only — same as draft time.
 
+**Development upside grade** (`ceiling_label`, v3 training feature): shown **only on your own roster and on the draft board** — the two contexts where scouting upside is the point. It is deliberately **hidden on the FA board and when scouting other teams' rosters** (players you don't own), to stay consistent with the information-asymmetry rule above: you only learn a player's ceiling by owning and coaching him. (This reverses training-spec decision #6's "given-up-on gems on the FA board" — the cleaner information model won out.)
+
 **Signing a FA:** Exact numbers become visible immediately once they're on your roster.
 
 **Cutting a player:** They return to the FA pool as labels. The engine doesn't track per-coach visibility history — the simplest possible rule. The coach remembers what they had; the game doesn't need to.

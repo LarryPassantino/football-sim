@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/upside.dart';
 
 class _ScoutPlayer {
   final String id;
@@ -12,7 +11,6 @@ class _ScoutPlayer {
   final String position;
   final int age;
   final String compositeLabel;
-  final String ceilingLabel;
   final Map<String, String> namedStatLabels;
   final int injuryGamesRemaining;
 
@@ -22,7 +20,6 @@ class _ScoutPlayer {
         position = j['position'],
         age = j['age'],
         compositeLabel = j['composite_label'],
-        ceilingLabel = j['ceiling_label'],
         namedStatLabels = (j['named_stat_labels'] as Map<String, dynamic>)
             .map((k, v) => MapEntry(k, v as String)),
         injuryGamesRemaining = j['injury_games_remaining'];
@@ -203,12 +200,8 @@ class _ScoutScreenState extends State<ScoutScreen> {
     return ListTile(
       dense: true,
       title: Text(player.name),
-      subtitle: Row(
-        children: [
-          Text('Age ${player.age}${player.isInjured ? '  ·  OUT ${player.injuryGamesRemaining}g' : ''}'),
-          const SizedBox(width: 8),
-          UpsideChip(player.ceilingLabel, compact: true),
-        ],
+      subtitle: Text(
+        'Age ${player.age}${player.isInjured ? '  ·  OUT ${player.injuryGamesRemaining}g' : ''}',
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -482,14 +475,6 @@ class _ScoutPlayerSheetState extends State<_ScoutPlayerSheet> {
                   ),
                 ),
                 _compositeDisplay(context, player.compositeLabel),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text('Upside', style: Theme.of(context).textTheme.labelMedium),
-                const SizedBox(width: 10),
-                UpsideChip(player.ceilingLabel),
               ],
             ),
             const Divider(height: 32),

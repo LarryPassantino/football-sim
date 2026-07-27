@@ -129,12 +129,14 @@ class GameDetailResponse(BaseModel):
 
 
 class PlayerScoutItem(BaseModel):
+    # No ceiling_label here on purpose: upside is deliberately hidden for players
+    # you don't own (free agents + opponent scouting). You only see a player's
+    # development upside once he's on your roster or in the draft class.
     id:                     uuid.UUID
     name:                   str
     position:               str
     age:                    int
     composite_label:        str
-    ceiling_label:          str
     named_stat_labels:      dict[str, str]
     injury_games_remaining: int
 
@@ -404,6 +406,11 @@ class TransactionItem(BaseModel):
     other_team_name:   str | None
     other_player_name: str | None
     created_at:        str
+
+
+class TransactionsPageResponse(BaseModel):
+    items:       list[TransactionItem]
+    next_cursor: str | None            # opaque; pass back as ?cursor= for the next page
 
 
 class DraftStateResponse(BaseModel):

@@ -9,7 +9,7 @@
 ## Gameplay
 - [x] League leaders — split Defense into sub-sections (Tackles / Sacks / Interceptions) instead of single tackles-sorted list
 - [ ] Trade — player-for-player and n-for-n trades
-- [ ] --POST LAUNCH-- CPU roster moves — currently only fills open slots (injury-triggered); revisit proactive upgrades (release weak player, sign better FA) if CPU-heavy leagues need it
+- [ ] --POST LAUNCH-- CPU proactive roster upgrades — today CPUs only fill *open* slots (injury/hole), never upgrade a full roster, so good players pile up unclaimed in FA (this feeds the human's "gems" edge). Plan: let CPUs occasionally release a clearly-weak starter to sign a clearly-better FA. Timing is already handled — `run_cpu_roster_moves` runs at the *start* of each week (`league_service.py:634`) so human coaches get first crack at FAs after the previous week's injuries. Open tuning: how aggressive, and a gap threshold so CPUs don't churn. NOTE: CPU moves now write to the transactions feed, so proactive upgrades will show up there automatically once added.
 - [ ] --POST LAUNCH-- Trade — "Offer for Trade" from own roster (button commented out on RosterScreen)
 - [ ] --POST LAUNCH-- Trade — trade for draft pick
 - [x] Team history view — season-by-season W/L record tied to team_id, survives name changes

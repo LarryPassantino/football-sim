@@ -1,9 +1,10 @@
+import base64
 import random
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import or_, select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +22,7 @@ from ..schemas import (
     SignFARequest, StandingRow, StandingsResponse, TeamHistoryResponse, TeamMatchupSide,
     TeamNewsResponse, TeamPickerItem, TeamRenameRequest, TeamResponse, TradeRequest, TradeResponse,
     TrainingPlayerItem, TrainingStateResponse, TrainRequest, TrainResultResponse,
-    TransactionItem,
+    TransactionItem, TransactionsPageResponse,
 )
 from ..services.league_service import (
     create_league, OFFSEASON_DAYS, PRESEASON_DAYS,
@@ -57,9 +58,11 @@ async def _write_tx(
         league_id=league_id,
         season_id=season_id,
         tx_type=tx_type,
+        team_id=team.id,
         team_name=team.name,
         player_name=player.name,
         player_position=player.position,
+        other_team_id=other_team.id if other_team else None,
         other_team_name=other_team.name if other_team else None,
         other_player_name=other_player.name if other_player else None,
     ))
@@ -676,7 +679,6 @@ def _to_scout_items(players) -> list[PlayerScoutItem]:
             position=p.position,
             age=p.age,
             composite_label=assign_label(p.composite),
-            ceiling_label=assign_ceiling_label(p.composite, p.potential, p.id),
             named_stat_labels={name: assign_label(stat_dict[name]) for name in ordered},
             injury_games_remaining=p.injury_games_remaining,
         ))
@@ -1553,39 +1555,73 @@ async def set_draft_board(
 # TRANSACTION ENDPOINTS
 # ============================================================
 
-@router.get('/{league_id}/transactions', response_model=list[TransactionItem])
+def _encode_cursor(t: Transaction) -> str:
+    raw = f'{t.created_at.isoformat()}|{t.id}'
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    raw = base64.urlsafe_b64decode(cursor.encode()).decode()
+    ts_str, id_str = raw.rsplit('|', 1)
+    return datetime.fromisoformat(ts_str), uuid.UUID(id_str)
+
+
+@router.get('/{league_id}/transactions', response_model=TransactionsPageResponse)
 async def get_transactions(
     league_id: uuid.UUID,
-    coach:     Coach        = Depends(get_current_coach),
-    db:        AsyncSession = Depends(get_db),
+    team_id:   uuid.UUID | None = Query(None, description='Filter to one team (matches either side of a trade)'),
+    cursor:    str | None       = Query(None, description='Opaque pagination cursor from a previous page'),
+    limit:     int              = Query(25, ge=1, le=100),
+    coach:     Coach            = Depends(get_current_coach),
+    db:        AsyncSession     = Depends(get_db),
 ):
     result = await db.execute(
         select(Team).where(Team.league_id == league_id, Team.coach_id == coach.id)
     )
     _require_team_in_league(result.scalar_one_or_none())
 
-    result = await db.execute(
-        select(Season.id)
-        .where(Season.league_id == league_id)
-        .order_by(Season.season_number.desc())
-        .limit(1)
-    )
-    season_id = result.scalar_one_or_none()
-    result = await db.execute(
+    season_id = await _current_season_id(db, league_id)
+
+    query = (
         select(Transaction)
         .where(Transaction.league_id == league_id, Transaction.season_id == season_id)
-        .order_by(Transaction.created_at.desc())
+        .order_by(Transaction.created_at.desc(), Transaction.id.desc())
     )
-    txs = result.scalars().all()
-    return [
-        TransactionItem(
-            tx_type=t.tx_type.value,
-            team_name=t.team_name,
-            player_name=t.player_name,
-            player_position=t.player_position,
-            other_team_name=t.other_team_name,
-            other_player_name=t.other_player_name,
-            created_at=t.created_at.isoformat(),
+    if team_id is not None:
+        query = query.where(
+            or_(Transaction.team_id == team_id, Transaction.other_team_id == team_id)
         )
-        for t in txs
-    ]
+    if cursor is not None:
+        try:
+            c_ts, c_id = _decode_cursor(cursor)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail='Invalid cursor')
+        # Keyset: everything strictly "older" than the cursor in (created_at, id) DESC order.
+        query = query.where(
+            or_(
+                Transaction.created_at < c_ts,
+                and_(Transaction.created_at == c_ts, Transaction.id < c_id),
+            )
+        )
+
+    # Fetch one extra to know whether another page exists.
+    result = await db.execute(query.limit(limit + 1))
+    rows = result.scalars().all()
+    has_more = len(rows) > limit
+    page = rows[:limit]
+
+    return TransactionsPageResponse(
+        items=[
+            TransactionItem(
+                tx_type=t.tx_type.value,
+                team_name=t.team_name,
+                player_name=t.player_name,
+                player_position=t.player_position,
+                other_team_name=t.other_team_name,
+                other_player_name=t.other_player_name,
+                created_at=t.created_at.isoformat(),
+            )
+            for t in page
+        ],
+        next_cursor=_encode_cursor(page[-1]) if has_more and page else None,
+    )

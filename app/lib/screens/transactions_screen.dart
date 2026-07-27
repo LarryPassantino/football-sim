@@ -78,78 +78,165 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 class _TransactionsScreenState extends State<TransactionsScreen> {
-  List<_Tx>? _txs;
+  static const _pageSize = 25;
+
+  final List<_Tx> _txs = [];
+  final ScrollController _scroll = ScrollController();
+
+  bool _mineOnly = false;
+  String? _nextCursor;
+  bool _initialLoading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _scroll.addListener(_onScroll);
+    _load(reset: true);
   }
 
-  Future<void> _load() async {
-    setState(() { _error = null; _txs = null; });
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    // Load the next page when within 400px of the bottom.
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 400) {
+      _load();
+    }
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if (reset) {
+      setState(() {
+        _txs.clear();
+        _nextCursor = null;
+        _hasMore = true;
+        _error = null;
+        _initialLoading = true;
+      });
+    } else {
+      // Guard against re-entrancy and end-of-feed.
+      if (_loadingMore || !_hasMore || _initialLoading) return;
+      setState(() { _loadingMore = true; });
+    }
+
     try {
       final auth = context.read<AuthProvider>();
-      final res = await http.get(
-        Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/transactions'),
-        headers: auth.authHeaders,
-      );
+      final params = <String, String>{'limit': '$_pageSize'};
+      if (_mineOnly && auth.teamId != null) params['team_id'] = auth.teamId!;
+      if (!reset && _nextCursor != null) params['cursor'] = _nextCursor!;
+
+      final uri = Uri.parse('$kBaseUrl/leagues/${widget.leagueId}/transactions')
+          .replace(queryParameters: params);
+      final res = await http.get(uri, headers: auth.authHeaders);
       if (res.statusCode != 200) throw Exception('Failed to load transactions (${res.statusCode})');
-      final data = jsonDecode(res.body) as List;
+
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final items = (body['items'] as List)
+          .map((j) => _Tx.fromJson(j as Map<String, dynamic>))
+          .toList();
+      if (!mounted) return;
       setState(() {
-        _txs = data.map((j) => _Tx.fromJson(j as Map<String, dynamic>)).toList();
+        _txs.addAll(items);
+        _nextCursor = body['next_cursor'] as String?;
+        _hasMore = _nextCursor != null;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
+    } finally {
+      if (mounted) setState(() { _initialLoading = false; _loadingMore = false; });
     }
+  }
+
+  void _setScope(bool mineOnly) {
+    if (mineOnly == _mineOnly) return;
+    setState(() { _mineOnly = mineOnly; });
+    _load(reset: true);
   }
 
   @override
   Widget build(BuildContext context) {
+    final canFilterMine = context.read<AuthProvider>().teamId != null;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Transactions'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => _load(reset: true)),
         ],
       ),
-      body: _txs == null && _error == null
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!))
-              : _txs!.isEmpty
-                  ? const Center(child: Text('No transactions this season'))
-                  : ListView.separated(
-                      itemCount: _txs!.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, i) {
-                        final tx = _txs![i];
-                        return ListTile(
-                          leading: SizedBox(
-                            width: 28,
-                            child: Center(
-                              child: Text(
-                                tx.prefix,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: tx.prefixColor(context),
-                                ),
-                              ),
-                            ),
-                          ),
-                          title: Text(tx.summary, style: const TextStyle(fontSize: 13)),
-                          subtitle: Text(
-                            _formatDate(tx.createdAt),
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        );
-                      },
-                    ),
+      body: Column(
+        children: [
+          if (canFilterMine)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('All'), icon: Icon(Icons.groups)),
+                  ButtonSegment(value: true, label: Text('My Team'), icon: Icon(Icons.person)),
+                ],
+                selected: {_mineOnly},
+                onSelectionChanged: (s) => _setScope(s.first),
+              ),
+            ),
+          Expanded(child: _buildFeed(context)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeed(BuildContext context) {
+    if (_initialLoading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) return Center(child: Text(_error!));
+    if (_txs.isEmpty) {
+      return Center(child: Text(_mineOnly ? 'No moves by your team yet' : 'No transactions this season'));
+    }
+    return RefreshIndicator(
+      onRefresh: () => _load(reset: true),
+      child: ListView.separated(
+        controller: _scroll,
+        itemCount: _txs.length + (_hasMore ? 1 : 0),
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, i) {
+          if (i >= _txs.length) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: SizedBox(
+                width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2),
+              )),
+            );
+          }
+          final tx = _txs[i];
+          return ListTile(
+            leading: SizedBox(
+              width: 28,
+              child: Center(
+                child: Text(
+                  tx.prefix,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: tx.prefixColor(context),
+                  ),
+                ),
+              ),
+            ),
+            title: Text(tx.summary, style: const TextStyle(fontSize: 13)),
+            subtitle: Text(
+              _formatDate(tx.createdAt),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          );
+        },
+      ),
     );
   }
 

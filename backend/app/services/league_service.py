@@ -21,6 +21,7 @@ from sim.training_sim import resolve_training_session, attainable_ceiling
 from ..models import (
     Coach, Game, GameStatus, League, LeagueStatus,
     Player, PlayerGameStats, Season, SeasonStatus, Team,
+    Transaction, TransactionType,
 )
 from .sim_bridge import clear_all_injuries, play_game
 from .push_service import send_game_result
@@ -406,6 +407,29 @@ async def _ensure_fa_minimums(db: AsyncSession, league_id: uuid.UUID) -> None:
             ))
 
 
+def _record_tx(
+    db: AsyncSession,
+    season: Season,
+    tx_type: TransactionType,
+    team: Team,
+    player: Player,
+    other_player: Player | None = None,
+) -> None:
+    """Log a CPU roster move so it shows up in the transactions feed alongside
+    human moves. Mirrors the router's _write_tx (names are snapshotted here because
+    a dropped player's team_name would otherwise change)."""
+    db.add(Transaction(
+        league_id=season.league_id,
+        season_id=season.id,
+        tx_type=tx_type,
+        team_id=team.id,
+        team_name=team.name,
+        player_name=player.name,
+        player_position=player.position,
+        other_player_name=other_player.name if other_player else None,
+    ))
+
+
 async def run_cpu_roster_moves(db: AsyncSession, season: Season) -> None:
     """
     After each game tick, CPU teams:
@@ -448,6 +472,7 @@ async def run_cpu_roster_moves(db: AsyncSession, season: Season) -> None:
                 drop.team_id = None
                 drop.on_ir   = False
             ir_player.on_ir = False
+            _record_tx(db, season, TransactionType.activate, team, ir_player, other_player=drop)
 
         # Flush so dropped players appear as free agents in the next query
         await db.flush()
@@ -480,6 +505,7 @@ async def run_cpu_roster_moves(db: AsyncSession, season: Season) -> None:
             if fa:
                 fa.team_id = team.id
                 fa.on_ir   = False
+                _record_tx(db, season, TransactionType.sign, team, fa)
 
     await _ensure_fa_minimums(db, league_id)
 
